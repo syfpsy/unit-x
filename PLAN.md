@@ -538,3 +538,15 @@ novel later:
   cosmetics system, and GDPR surfaces. Phase 10 captures future parking
   lot. Original Phase 5/6/7 content preserved and merged into the new
   5/8/9 respectively.
+- **2026-04-21** — Phase 4 shipped. Neon → Supabase Postgres migration,
+  `@supabase/ssr` wired through `proxy.ts` + server/browser clients,
+  IDENTIFY gate rewritten with `[Y] proceed → { ◆ google | ◆ magic
+  link }` and a truly ephemeral skip path. Schema delta (`auth_user_id`
+  on operators + RLS policies) applied via a non-interactive migration.
+  `/auth/callback`, `/auth/confirm`, `/auth/signout` live. Every handler
+  now resolves the operator from the Supabase session via
+  `lib/auth/getOperator`. Switched DB driver from
+  `@neondatabase/serverless` to `postgres.js` (Supavisor-compatible).
+  Live at https://unit-x-eta.vercel.app. Magic link works out of the
+  box; Google OAuth requires one-time configuration in the Supabase
+  dashboard + Google Cloud (see next-steps note in agent memory).
