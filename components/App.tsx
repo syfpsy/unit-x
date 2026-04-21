@@ -471,7 +471,7 @@ export function App() {
                 speakingTick={speakingTick}
                 sessionStart={sessionStart}
                 evolution={evolution}
-                mascotTemplateOverride={equipped.mascot?.payload.template ?? null}
+                mascotCosmeticPayload={equipped.mascot?.payload ?? null}
               />
             </div>
           )}

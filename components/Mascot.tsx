@@ -1,37 +1,36 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
-import { MASCOT_BY_STAGE } from './mascots/stages';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { usePrefersReducedMotion } from '@/lib/usePrefersReducedMotion';
-import type { MascotState } from './types';
+import { mergeSpecs, renderPortrait } from '@/lib/portrait/render';
+import { STAGE_SPECS } from '@/lib/portrait/stages';
+import type { CosmeticPayload } from '@/lib/cosmetics/types';
 import type { EvolutionStage } from '@/lib/evolution';
+import type { MascotState } from './types';
 
 interface MascotProps {
   state?: MascotState;
   speakingTick?: number;
-  /** Evolution stage drives the ASCII template. Defaults to stage 1 (base). */
+  /** Evolution stage drives the default slot assignment. Defaults to 1. */
   stage?: EvolutionStage;
-  /**
-   * When an equipped mascot cosmetic has a literal template (i.e. not the
-   * default "delegate to stage" variant), the gallery pushes it in here
-   * and it replaces the stage-based rendering until something else is
-   * equipped. `null` means fall back to stage-based.
-   */
-  templateOverride?: string | null;
+  /** Equipped mascot cosmetic's payload. Supports three shapes:
+   *    - `{ delegate: 'stage' | 'default' }` → render stage default unchanged
+   *    - `{ template: '…' }`                  → render literal (legacy path)
+   *    - `{ slotOverrides: { slots: {…} } }`  → overlay on top of stage default
+   *  null means no cosmetic equipped — same as `delegate: 'stage'`. */
+  cosmeticPayload?: CosmeticPayload | null;
 }
 
 export function Mascot({
   state = 'idle',
   speakingTick = 0,
   stage = 1,
-  templateOverride = null,
+  cosmeticPayload = null,
 }: MascotProps) {
   const [blink, setBlink] = useState(false);
   const [frame, setFrame] = useState(0);
   const reduced = usePrefersReducedMotion();
 
-  // Skip random blinks when the user prefers reduced motion — the
-  // `-` eye glyph would still flash every few seconds otherwise.
   useEffect(() => {
     if (reduced) {
       setBlink(false);
@@ -50,9 +49,6 @@ export function Mascot({
     return () => clearTimeout(t);
   }, [reduced]);
 
-  // Mouth-frame cycling only runs while the model is speaking AND the
-  // user hasn't asked for reduced motion. Static mouth (`─────`) remains
-  // rendered in either quieted state — the shape is still legible.
   useEffect(() => {
     if (reduced || state !== 'speaking') {
       setFrame(0);
@@ -66,14 +62,21 @@ export function Mascot({
   const mouthChars = (() => {
     if (state === 'thinking') return reduced ? '·····' : '· · ·';
     if (state !== 'speaking') return '─────';
-    // speaking + reduced motion → hold a single frame that reads as "mouth open".
     if (reduced) return '▂▂▂▂▂';
     return (['▁▁▁▁▁', '▂▃▂▃▂', '▁▂▃▂▁'] as const)[frame];
   })();
 
-  const template = templateOverride ?? MASCOT_BY_STAGE[stage] ?? MASCOT_BY_STAGE[1];
-  // Substitute the 5-char mouth first so it doesn't collide with the
-  // single-char `E` eye marker. `M` appears exactly once per template.
+  // Resolve the mascot template. Memoised so changing only eye/mouth
+  // state doesn't re-run the slot merger. Recomputed when stage or the
+  // equipped cosmetic changes.
+  const template = useMemo(() => {
+    if (cosmeticPayload?.template) return cosmeticPayload.template;
+    const base = STAGE_SPECS[stage] ?? STAGE_SPECS[1];
+    const overlay = cosmeticPayload?.slotOverrides;
+    const spec = overlay ? mergeSpecs(base, overlay) : base;
+    return renderPortrait(spec);
+  }, [stage, cosmeticPayload]);
+
   const withMouth = template.replace(/M/, mouthChars);
   const withEyes = withMouth.split('E').map((seg, i, arr) => (
     <Fragment key={i}>

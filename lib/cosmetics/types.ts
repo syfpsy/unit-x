@@ -1,4 +1,5 @@
 import type { EvolutionStage } from '@/lib/evolution';
+import type { PortraitSpec } from '@/lib/portrait/types';
 import type { MemoryTag } from '@/components/types';
 
 export type CosmeticKind =
@@ -17,10 +18,15 @@ export type UnlockRule =
   | { type: 'stage_reached'; stage: EvolutionStage };
 
 export interface CosmeticPayload {
-  /** mascot: a literal ASCII template with `E` (eyes) and `M` (mouth) markers. */
+  /** mascot: a literal ASCII template with `E` (eyes) and `M` (mouth) markers.
+   *  Still supported for static drawings; new mascots should prefer
+   *  `slotOverrides` so they compose with the stage/mode system. */
   template?: string;
-  /** mascot: delegate to the stage-based renderer instead of a fixed template. */
+  /** mascot: delegate to the stage-based renderer instead of a fixed template.
+   *  Equivalent to an empty `slotOverrides`, kept for the default row. */
   delegate?: 'stage' | 'default';
+  /** mascot: slot-by-slot overlay on top of the stage defaults. Phase 10+. */
+  slotOverrides?: PortraitSpec;
   /** boot_banner: explicit line array (type + string). */
   lines?: Array<{ t: 'dim' | 'faint' | 'ok' | 'violet' | 'warn'; s: string }>;
 }

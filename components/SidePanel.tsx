@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Mascot } from './Mascot';
 import type { MascotState, Memory } from './types';
 import type { EvolutionState } from '@/lib/evolution';
+import type { CosmeticPayload } from '@/lib/cosmetics/types';
 
 interface SidePanelProps {
   operator: string | null;
@@ -12,8 +13,9 @@ interface SidePanelProps {
   speakingTick: number;
   sessionStart: number;
   evolution: EvolutionState | null;
-  /** Equipped mascot-cosmetic template; null means use stage-based rendering. */
-  mascotTemplateOverride?: string | null;
+  /** Equipped mascot cosmetic payload (full, so the Mascot can decide
+   *  template vs slotOverrides). Null means no cosmetic equipped. */
+  mascotCosmeticPayload?: CosmeticPayload | null;
 }
 
 export function SidePanel({
@@ -23,7 +25,7 @@ export function SidePanel({
   speakingTick,
   sessionStart,
   evolution,
-  mascotTemplateOverride = null,
+  mascotCosmeticPayload = null,
 }: SidePanelProps) {
   const [uptime, setUptime] = useState('00:00');
 
@@ -68,7 +70,7 @@ export function SidePanel({
             state={mascotState}
             speakingTick={speakingTick}
             stage={evolution?.stage ?? 1}
-            templateOverride={mascotTemplateOverride}
+            cosmeticPayload={mascotCosmeticPayload}
           />
         </div>
       </div>

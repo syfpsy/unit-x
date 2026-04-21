@@ -550,6 +550,23 @@ novel later:
   Live at https://unit-x-eta.vercel.app. Magic link works out of the
   box; Google OAuth requires one-time configuration in the Supabase
   dashboard + Google Cloud (see next-steps note in agent memory).
+- **2026-04-22** — Phase 10 shipped. Slot-based portrait system.
+  Nine composable slots (`overhead / antenna / crown / body /
+  inner_jaw / base_cap / neck / base_plate / under`) with a variant
+  registry (`lib/portrait/parts.ts`) and a vertical renderer
+  (`lib/portrait/render.ts`). Stage defaults (`lib/portrait/stages.ts`)
+  produce byte-identical output to the hand-audited Phase 9 templates
+  (verified by inline test). `CosmeticPayload` gains `slotOverrides`;
+  `mascot-rooted` migrated from a literal template to a one-slot
+  override (`{ slots: { under: 'roots-classic' } }`) via
+  `0006_rooted_slotified.sql`. Mascot component rewritten to accept
+  the full cosmetic payload and resolve template / slotOverrides /
+  delegate internally; memoised so only stage + cosmetic changes
+  re-render the template. Legacy `template` path preserved for
+  cosmetics that are intentionally whole drawings. Architecture
+  note updated: portrait section moves from "planned" to "shipped"
+  with a next-steps list (mode-driven variants, companion/env slots,
+  anchors).
 - **2026-04-22** — Phase 9 shipped. Polish + launch readiness.
   `prefers-reduced-motion` media query expanded to every CSS animation
   we reach (flicker / beam / curve / breathing / blink / status-pulse /

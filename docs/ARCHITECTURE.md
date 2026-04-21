@@ -43,57 +43,69 @@ directly; it goes through `/api/*`. If you catch a Shell component
 reaching into the DB layer, that's a seam leak — fix it before the
 feature lands.
 
-## Portrait system (composable target)
+## Portrait system — slot-based (shipped Phase 10)
 
-Today the mascot is one of five stage templates plus optional
-cosmetic overrides. The target is slot-based — the five templates
-stay as presets, but each becomes a composition of named parts so
-cosmetics, evolution stage, mode, and milestone unlocks can each
-modify specific slots without the art files being the source of truth.
+The mascot is a vertical composition of nine named slots. Every slot
+has a registry of variants; a `PortraitSpec` names one variant per slot;
+the renderer concatenates their output. Stage defaults live in
+`lib/portrait/stages.ts`; cosmetics overlay on top.
 
-### Slots (planned)
+### Slots (shipped)
 
 ```
-portrait
-├── aureole    (above the crown — earned ornamentation)
-├── antenna    (single strut + tip)
-├── crown      (top border: light | heavy | doubled)
-├── head_shell (outer silhouette)
-├── eyes       (violet; per-mode glyph)
-├── mouth      (5-char mouth; per-mode state)
-├── jaw        (inner chin detail or null)
-├── base_shell (bottom border)
-├── neck       (struts)
-├── base_plate (tap pattern + width)
-├── companion  (object floating beside — earned)
-└── environment (subtle background glyphs — earned)
+portrait (lib/portrait/types.ts)
+├── overhead    aureole / earned crown ornamentation   (0-2 lines)
+├── antenna     single upward strut                     (0-1 line)
+├── crown       top border — round-light | round-heavy | square-heavy
+├── body        face silhouette + eye slots + mouth    (6 lines, atomic)
+├── inner_jaw   curl inside the face bottom            (0-1 line)
+├── base_cap    bottom border                           (1 line)
+├── neck        struts between head and base            (0-1 line)
+├── base_plate  tap pattern — thin | wide | narrow     (0-1 line)
+└── under       roots, platform, environment glyphs    (0-N lines)
 ```
 
-### Render spec (planned)
+`body` keeps `E` (eye) and `M` (mouth) substitution markers — the
+Mascot component swaps them at render based on mode, so the slot
+system doesn't need separate eye/mouth variants yet.
+
+### Render spec (shipped)
 
 ```ts
 interface PortraitSpec {
-  stage: 0 | 1 | 2 | 3 | 4;
-  mode: 'idle' | 'thinking' | 'speaking' | 'dreaming' | 'recovering' | 'focused';
-  slots: Partial<Record<SlotName, SlotVariantSlug>>;
-  palette: { phosphor: PhosphorKey; accent?: AccentKey };
+  slots: Partial<Record<SlotName, string>>; // slot → variant slug
 }
 ```
 
-- **Variants** live in a catalogue (same pattern as cosmetics) with
-  unlock rules.
-- **Anchors** let variants declare which other slots they're compatible
-  with (e.g. aureole + heavy crown is allowed; aureole + no crown is a
-  fallback to a lighter aureole).
-- **Fallback**: if a slot variant isn't unlocked, render the default
-  for that stage.
-- **Overlays** (damage marks, seasonal glyphs) stack above the base
-  render and don't replace slots.
+- **Variants** live in `lib/portrait/parts.ts`. Each is a
+  `readonly string[]` — pre-aligned whole lines. Render order is
+  fixed in `SLOT_ORDER`.
+- **Stage defaults** in `lib/portrait/stages.ts`. Verified byte-
+  identical to the hand-audited Phase 9 templates (a tiny inline
+  node test round-trips stages 1 and 4).
+- **Cosmetic overlays** use `CosmeticPayload.slotOverrides` to add
+  or replace slot variants on top of the stage default.
+  `mascot-rooted` is the reference implementation:
+  `{ slots: { under: 'roots-classic' } }` — composes with whatever
+  stage the operator wears it at.
+- **Legacy path** `CosmeticPayload.template` still works for static
+  drawings (e.g. `mascot-sentinel` keeps a narrow silhouette as a
+  literal until per-slot narrow variants are fleshed out).
+- **Fallback**: unknown variant slugs are silently skipped so a typo
+  in a payload can't crash the render.
 
-This is a refactor, not a rewrite. Today's five stage templates become
-"stage-N default" slot assignments in the new registry; every existing
-cosmetic becomes a `{ slot, variant }` entry. See the planning note
-under Phase 10 for the migration path.
+### What's next on this axis
+
+- **Mode-driven variants** — today mouth + eyes react to mode inside
+  the Mascot component. Moving them into slot variants (`eyes-
+  dreaming`, `mouth-thinking`, etc.) is the Phase 11 shape; needs a
+  way to pipe the current mode into `PortraitSpec`.
+- **Companion / environment slots** — a floating object beside the
+  head, subtle glyphs around it. Seeded by future cosmetics.
+- **Anchors / compatibility rules** — right now slots are independent.
+  If we ship a variant that requires a specific crown (e.g. an
+  "oversized aureole" that needs heavy borders to not look awkward),
+  we'll add an `anchors` field and validate on equip.
 
 ## Memory categories (planned split)
 
