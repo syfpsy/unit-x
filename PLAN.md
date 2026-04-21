@@ -550,6 +550,25 @@ novel later:
   Live at https://unit-x-eta.vercel.app. Magic link works out of the
   box; Google OAuth requires one-time configuration in the Supabase
   dashboard + Google Cloud (see next-steps note in agent memory).
+- **2026-04-22** — Phase 9 shipped. Polish + launch readiness.
+  `prefers-reduced-motion` media query expanded to every CSS animation
+  we reach (flicker / beam / curve / breathing / blink / status-pulse /
+  save-flash transform); `<Mascot>` now reads `usePrefersReducedMotion`
+  and holds a static frame for mouth cycling + random blink. Focus-visible
+  violet halo on every interactive element. `role="dialog"` + `aria-modal`
+  on Identify / SoulDoc / Gallery; `<nav aria-label="directives">` on the
+  hints bar; `<Mascot>` gets a live `aria-label`. `/privacy` and `/terms`
+  pages shipped in the terminal voice, linked from the IDENTIFY footer
+  with "by proceeding you accept both". `app/opengraph-image.tsx`
+  renders a 1200×630 stage-4 mascot card via `next/og`. Full metadata
+  (`metadataBase`, title template, OG + Twitter, keywords) in
+  `app/layout.tsx`. Audited all 5 stage mascots + migrated the 2
+  cosmetic mascots in `0005_mascot_polish.sql` so the neck + base
+  pattern is consistent and the `╧╧` asymmetry is gone. Added
+  `docs/ARCHITECTURE.md` — the Shell / Mind / Memory decomposition,
+  slot-based portrait spec, memory category taxonomy, mode expansion,
+  command-as-ritual discipline, and a risk register that each phase is
+  expected to leave truer than it found.
 - **2026-04-22** — Phase 8 shipped. Hardening layer.
   In-memory token-bucket rate limits on `/api/complete` (15 burst,
   15/min), `/api/forget` (5 burst, 6/min), `/api/export` (3 burst,
