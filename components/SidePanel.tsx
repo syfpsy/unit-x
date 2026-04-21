@@ -12,6 +12,8 @@ interface SidePanelProps {
   speakingTick: number;
   sessionStart: number;
   evolution: EvolutionState | null;
+  /** Equipped mascot-cosmetic template; null means use stage-based rendering. */
+  mascotTemplateOverride?: string | null;
 }
 
 export function SidePanel({
@@ -21,6 +23,7 @@ export function SidePanel({
   speakingTick,
   sessionStart,
   evolution,
+  mascotTemplateOverride = null,
 }: SidePanelProps) {
   const [uptime, setUptime] = useState('00:00');
 
@@ -65,6 +68,7 @@ export function SidePanel({
             state={mascotState}
             speakingTick={speakingTick}
             stage={evolution?.stage ?? 1}
+            templateOverride={mascotTemplateOverride}
           />
         </div>
       </div>

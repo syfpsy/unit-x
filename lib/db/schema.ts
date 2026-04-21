@@ -1,4 +1,4 @@
-import { customType, integer, pgTable, primaryKey, uuid, varchar, timestamp, index } from 'drizzle-orm/pg-core';
+import { boolean, customType, integer, jsonb, pgTable, primaryKey, uuid, varchar, timestamp, index } from 'drizzle-orm/pg-core';
 
 /**
  * Drizzle doesn't ship a first-class bytea type — this custom type bridges
@@ -80,4 +80,42 @@ export const stageTransitions = pgTable(
     reachedAt: timestamp('reached_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.operatorId, t.stage] })],
+);
+
+/**
+ * Cosmetics catalogue — seeded from migrations, not mutated at runtime.
+ * `payload` is the kind-specific config (mascot ASCII, boot banner lines,
+ * etc). `unlock_rule` is an opaque JSON DSL interpreted by
+ * `lib/cosmetics/evaluate.ts`.
+ */
+export const cosmetics = pgTable('cosmetics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: varchar('slug', { length: 80 }).notNull().unique(),
+  // 'mascot' | 'boot_banner' | 'phosphor_palette' | 'idle_art' | 'frame' | 'divider'
+  kind: varchar('kind', { length: 24 }).notNull(),
+  name: varchar('name', { length: 120 }).notNull(),
+  blurb: varchar('blurb', { length: 240 }).notNull(),
+  payload: jsonb('payload').notNull(),
+  unlockRule: jsonb('unlock_rule').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Per-operator cosmetic state: which items have been first-observed
+ * (`unlocked_at`) and which are currently equipped. Only one cosmetic
+ * per kind may be equipped at a time — enforced in the equip helper.
+ */
+export const operatorCosmetics = pgTable(
+  'operator_cosmetics',
+  {
+    operatorId: uuid('operator_id')
+      .notNull()
+      .references(() => operators.id, { onDelete: 'cascade' }),
+    cosmeticId: uuid('cosmetic_id')
+      .notNull()
+      .references(() => cosmetics.id, { onDelete: 'cascade' }),
+    unlockedAt: timestamp('unlocked_at', { withTimezone: true }).notNull().defaultNow(),
+    equipped: boolean('equipped').notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.operatorId, t.cosmeticId] })],
 );

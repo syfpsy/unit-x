@@ -16,6 +16,7 @@ import type { MascotState, Memory, Message, Who } from './types';
 const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
   { cmd: '/help', desc: 'show this list' },
   { cmd: '/soul', desc: 'open the soul.md ledger' },
+  { cmd: '/gallery', desc: 'open the cosmetic wardrobe' },
   { cmd: '/save', desc: 'commit current thread to /soul/' },
   { cmd: '/clear', desc: 'wipe visible scroll (memory persists)' },
   { cmd: '/who', desc: 'report identity + uptime' },
@@ -97,6 +98,7 @@ interface TerminalProps {
   setMascotState: Dispatch<SetStateAction<MascotState>>;
   bumpSpeak: () => void;
   openSoul: () => void;
+  openGallery: () => void;
   doSave: () => void;
   doClear: () => void;
   doLogout: () => void;
@@ -120,6 +122,7 @@ export function Terminal({
   setMascotState,
   bumpSpeak,
   openSoul,
+  openGallery,
   doSave,
   doClear,
   doLogout,
@@ -424,6 +427,10 @@ export function Terminal({
       }
       if (cmd === '/soul') {
         openSoul();
+        return;
+      }
+      if (cmd === '/gallery') {
+        openGallery();
         return;
       }
       if (cmd === '/save') {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-type BootLine = { t: 'dim' | 'faint' | 'ok' | 'violet' | 'warn'; s: string };
+export type BootLine = { t: 'dim' | 'faint' | 'ok' | 'violet' | 'warn'; s: string };
 
 const BOOT_LINES: ReadonlyArray<BootLine> = [
   { t: 'dim', s: '>> NXZ-UNIT TERMINAL SERVICES  v4.21.06b' },
@@ -31,21 +31,29 @@ const BOOT_LINES: ReadonlyArray<BootLine> = [
 interface BootProps {
   onComplete: () => void;
   speed?: number;
+  /**
+   * Optional replacement line set from an equipped boot-banner cosmetic.
+   * Falls back to the classic sequence when unset. Injected by App after
+   * reading `equipped-banner-lines` from localStorage — the boot runs
+   * before any network call.
+   */
+  lines?: ReadonlyArray<BootLine>;
 }
 
-export function Boot({ onComplete, speed = 1 }: BootProps) {
+export function Boot({ onComplete, speed = 1, lines }: BootProps) {
+  const BOOT = lines && lines.length > 0 ? lines : BOOT_LINES;
   const [shown, setShown] = useState(0);
   const [subChar, setSubChar] = useState(0);
   const doneRef = useRef(false);
 
   useEffect(() => {
     if (doneRef.current) return;
-    if (shown >= BOOT_LINES.length) {
+    if (shown >= BOOT.length) {
       doneRef.current = true;
       const t = setTimeout(onComplete, 600);
       return () => clearTimeout(t);
     }
-    const line = BOOT_LINES[shown];
+    const line = BOOT[shown];
     if (!line.s) {
       const t = setTimeout(() => setShown((s) => s + 1), 60 / speed);
       return () => clearTimeout(t);
@@ -67,14 +75,14 @@ export function Boot({ onComplete, speed = 1 }: BootProps) {
 
   return (
     <div className="boot">
-      {BOOT_LINES.slice(0, shown).map((l, i) => (
+      {BOOT.slice(0, shown).map((l, i) => (
         <pre key={i} className={l.t}>
           {l.s || ' '}
         </pre>
       ))}
-      {shown < BOOT_LINES.length && (
-        <pre className={BOOT_LINES[shown].t}>
-          {BOOT_LINES[shown].s.slice(0, subChar)}
+      {shown < BOOT.length && (
+        <pre className={BOOT[shown].t}>
+          {BOOT[shown].s.slice(0, subChar)}
           <span style={{ background: 'var(--phosphor)', color: '#000', padding: '0 3px' }}>_</span>
         </pre>
       )}

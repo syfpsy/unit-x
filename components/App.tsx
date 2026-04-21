@@ -6,8 +6,9 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Boot } from './Boot';
+import { Boot, type BootLine } from './Boot';
 import { GlitchOverlay, ParticleBurst } from './Fx';
+import { Gallery } from './Gallery';
 import { Identify } from './Identify';
 import { IdleReverie } from './IdleReverie';
 import { SidePanel } from './SidePanel';
@@ -16,6 +17,7 @@ import { Terminal } from './Terminal';
 import { PHOSPHORS, Tweaks } from './Tweaks';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { computeEvolution, type EvolutionStage, type EvolutionState } from '@/lib/evolution';
+import type { CosmeticPayload, GalleryEntry } from '@/lib/cosmetics/types';
 import type {
   CRTMode,
   CRTToggles,
@@ -101,6 +103,21 @@ export function App() {
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [operatorCreatedAt, setOperatorCreatedAt] = useState<Date | null>(null);
   const [evolution, setEvolution] = useState<EvolutionState | null>(null);
+  const [equipped, setEquipped] = useState<Record<string, { slug: string; name: string; payload: CosmeticPayload }>>({});
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [bootLines, setBootLines] = useState<ReadonlyArray<BootLine> | null>(null);
+
+  // Boot runs before any network call, so the equipped banner for this
+  // session has to come from localStorage (read-through cache populated by
+  // the most recent /api/ledger response). Default is `null` → classic.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('equipped-banner-lines');
+      if (raw) setBootLines(JSON.parse(raw));
+    } catch {
+      // ignore malformed cache
+    }
+  }, []);
 
   // Returning visitors with a live Supabase session skip the IDENTIFY gate —
   // the "it remembered me" moment is the whole point. Null while checking,
@@ -163,6 +180,8 @@ export function App() {
           memories: Array<{ id: string; tag: Memory['tag']; text: string; ts: number }>;
           evolution: EvolutionState | null;
           stageUp: { from: number; to: EvolutionStage } | null;
+          equipped: Record<string, { slug: string; name: string; payload: CosmeticPayload }>;
+          newlyUnlockedSlugs: string[];
         };
         if (cancelled) return;
         if (body.operator?.email) setOperator(body.operator.email);
@@ -180,11 +199,21 @@ export function App() {
           );
         }
         if (body.evolution) setEvolution(body.evolution);
+        if (body.equipped) {
+          setEquipped(body.equipped);
+          const banner = body.equipped.boot_banner;
+          if (banner?.payload?.lines) {
+            try {
+              localStorage.setItem('equipped-banner-lines', JSON.stringify(banner.payload.lines));
+            } catch {
+              // ignore quota
+            }
+          } else {
+            localStorage.removeItem('equipped-banner-lines');
+          }
+        }
         if (body.stageUp) {
           const { from, to } = body.stageUp;
-          // Defer the celebration until after the typewriter has a chance to
-          // settle — feels less like a notification spam and more like an
-          // observation the unit makes at the start of the session.
           setTimeout(() => {
             triggerSaveFlash(`◆ stage reached · ${body.evolution?.title ?? 'stage ' + to}`);
             setMessages((ms) => [
@@ -197,6 +226,24 @@ export function App() {
               },
             ]);
           }, 1800);
+        }
+        if (body.newlyUnlockedSlugs && body.newlyUnlockedSlugs.length > 0) {
+          // Stagger after stage-up so notifications don't collide. Uses a
+          // slightly longer delay than stage-up (2.4s vs 1.8s).
+          setTimeout(() => {
+            triggerSaveFlash(`◆ ${body.newlyUnlockedSlugs.length} cosmetic(s) unlocked`);
+            setMessages((ms) => [
+              ...ms,
+              {
+                id: Date.now(),
+                who: 'sys',
+                text:
+                  `> unlocked: ${body.newlyUnlockedSlugs.join(', ')}.\n` +
+                  `> open /gallery to inspect.`,
+                ts: Date.now(),
+              },
+            ]);
+          }, 2400);
         }
       } catch {
         // ignore — offline or DB down; chat still works statelessly
@@ -277,6 +324,7 @@ export function App() {
       if (e.key === 'Escape') {
         setSoulOpen(false);
         setTweaksOpen(false);
+        setGalleryOpen(false);
       }
       if (e.key === '?' && e.shiftKey) setTweaksOpen((o) => !o);
     }
@@ -370,6 +418,7 @@ export function App() {
               setMascotState={setMascotState}
               bumpSpeak={bumpSpeak}
               openSoul={() => setSoulOpen(true)}
+              openGallery={() => setGalleryOpen(true)}
               doSave={doSave}
               doClear={doClear}
               doLogout={doLogout}
@@ -390,6 +439,7 @@ export function App() {
                 speakingTick={speakingTick}
                 sessionStart={sessionStart}
                 evolution={evolution}
+                mascotTemplateOverride={equipped.mascot?.payload.template ?? null}
               />
             </div>
           )}
@@ -412,6 +462,9 @@ export function App() {
               </span>
               <span>
                 <kbd>/forget</kbd>excise
+              </span>
+              <span>
+                <kbd>/gallery</kbd>cosmetics
               </span>
               <span>
                 <kbd>esc</kbd>close
@@ -445,9 +498,35 @@ export function App() {
           />
         )}
 
+        {galleryOpen && (
+          <Gallery
+            onClose={() => setGalleryOpen(false)}
+            onEquipped={(entry) => {
+              setEquipped((prev) => ({
+                ...prev,
+                [entry.kind]: entry.payload
+                  ? { slug: entry.slug, name: entry.name, payload: entry.payload }
+                  : prev[entry.kind],
+              }));
+              if (entry.kind === 'boot_banner' && entry.payload?.lines) {
+                try {
+                  localStorage.setItem(
+                    'equipped-banner-lines',
+                    JSON.stringify(entry.payload.lines),
+                  );
+                } catch {
+                  // ignore
+                }
+              }
+              triggerSaveFlash(`◆ equipped · ${entry.name}`);
+            }}
+          />
+        )}
+
         {stage === 'boot' && (
           <Boot
             speed={1.2}
+            lines={bootLines ?? undefined}
             onComplete={() => {
               // If the session check is still in flight, default to requiring
               // identification. False positive costs one gate; false negative

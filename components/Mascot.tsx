@@ -10,9 +10,21 @@ interface MascotProps {
   speakingTick?: number;
   /** Evolution stage drives the ASCII template. Defaults to stage 1 (base). */
   stage?: EvolutionStage;
+  /**
+   * When an equipped mascot cosmetic has a literal template (i.e. not the
+   * default "delegate to stage" variant), the gallery pushes it in here
+   * and it replaces the stage-based rendering until something else is
+   * equipped. `null` means fall back to stage-based.
+   */
+  templateOverride?: string | null;
 }
 
-export function Mascot({ state = 'idle', speakingTick = 0, stage = 1 }: MascotProps) {
+export function Mascot({
+  state = 'idle',
+  speakingTick = 0,
+  stage = 1,
+  templateOverride = null,
+}: MascotProps) {
   const [blink, setBlink] = useState(false);
   const [frame, setFrame] = useState(0);
 
@@ -47,7 +59,7 @@ export function Mascot({ state = 'idle', speakingTick = 0, stage = 1 }: MascotPr
       ? '· · ·'
       : '─────';
 
-  const template = MASCOT_BY_STAGE[stage] ?? MASCOT_BY_STAGE[1];
+  const template = templateOverride ?? MASCOT_BY_STAGE[stage] ?? MASCOT_BY_STAGE[1];
   // Substitute the 5-char mouth first so it doesn't collide with the
   // single-char `E` eye marker. `M` appears exactly once per template.
   const withMouth = template.replace(/M/, mouthChars);
