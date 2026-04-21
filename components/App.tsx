@@ -14,6 +14,7 @@ import { SidePanel } from './SidePanel';
 import { SoulDoc } from './SoulDoc';
 import { Terminal } from './Terminal';
 import { PHOSPHORS, Tweaks } from './Tweaks';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type {
   CRTMode,
   CRTToggles,
@@ -96,6 +97,29 @@ export function App() {
 
   const [tweaks, setTweaks] = useState<TweakState>(TWEAK_DEFAULTS);
   const [tweaksOpen, setTweaksOpen] = useState(false);
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
+
+  // Returning visitors with a live Supabase session skip the IDENTIFY gate —
+  // the "it remembered me" moment is the whole point. Null while checking,
+  // true/false once resolved. Boot completion consults this when deciding
+  // where to land.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!cancelled) setHasSession(!!session);
+      } catch {
+        if (!cancelled) setHasSession(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Hydrate tweaks from localStorage on mount. Older stored shapes may not
   // have `crtToggles`; derive them from the preset so CRT still renders.
@@ -121,9 +145,9 @@ export function App() {
     }
   }, []);
 
-  // Once the app enters the live stage, pull the persisted ledger so the
-  // side panel and system prompt reflect everything the unit has learned
-  // across prior sessions. Silent on failure — DB may be unconfigured.
+  // Once the app enters the live stage, pull the persisted ledger + operator
+  // identity from the Supabase-backed server. Silent on failure — the stream
+  // still works without persistence.
   useEffect(() => {
     if (stage !== 'live') return;
     let cancelled = false;
@@ -132,17 +156,21 @@ export function App() {
         const res = await fetch('/api/ledger');
         if (!res.ok) return;
         const body = (await res.json()) as {
+          operator: { handle: string; email: string } | null;
           memories: Array<{ id: string; tag: Memory['tag']; text: string; ts: number }>;
         };
-        if (cancelled || !Array.isArray(body.memories)) return;
-        setMemories(
-          body.memories.map((m) => ({
-            id: m.id,
-            tag: m.tag,
-            text: m.text,
-            ts: m.ts,
-          })),
-        );
+        if (cancelled) return;
+        if (body.operator?.email) setOperator(body.operator.email);
+        if (Array.isArray(body.memories)) {
+          setMemories(
+            body.memories.map((m) => ({
+              id: m.id,
+              tag: m.tag,
+              text: m.text,
+              ts: m.ts,
+            })),
+          );
+        }
       } catch {
         // ignore — offline or DB down; chat still works statelessly
       }
@@ -225,6 +253,9 @@ export function App() {
     setMessages([]);
     setMemories([]);
     setStage('identify');
+    // Clear the Supabase session cookie too. The server redirect is swallowed
+    // here because we've already reset client state.
+    fetch('/auth/signout', { method: 'POST' }).catch(() => {});
   }
 
   const layoutAttr = tweaks.layout;
@@ -350,14 +381,22 @@ export function App() {
         )}
 
         {stage === 'boot' && (
-          <Boot speed={1.2} onComplete={() => setStage('identify')} />
+          <Boot
+            speed={1.2}
+            onComplete={() => {
+              // If the session check is still in flight, default to requiring
+              // identification. False positive costs one gate; false negative
+              // would briefly show private state on refresh.
+              setStage(hasSession ? 'live' : 'identify');
+            }}
+          />
         )}
         {stage === 'identify' && (
           <Identify
-            onAccept={(addr) => {
-              setOperator(addr);
+            onAccept={(identity) => {
+              setOperator(identity.email);
               setStage('live');
-              triggerSaveFlash(`◆ operator bound · ${addr}`);
+              triggerSaveFlash(`◆ operator bound · ${identity.handle}`);
             }}
             onSkip={() => {
               setOperator(null);

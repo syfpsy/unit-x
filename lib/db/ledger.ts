@@ -1,22 +1,12 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { getDb } from './client';
-import { memories, messages, operators } from './schema';
+import { memories, messages } from './schema';
 import type { MemoryTag, Who } from '@/components/types';
 
-/**
- * Phase 3: a single dev operator row backs every session. Phase 4 swaps
- * this out for magic-link-scoped lookup via the session cookie.
- */
-export async function getOrCreateDevOperator() {
-  const db = getDb();
-  const existing = await db.select().from(operators).limit(1);
-  if (existing.length > 0) return existing[0];
-  const [created] = await db
-    .insert(operators)
-    .values({ handle: 'operator' })
-    .returning();
-  return created;
-}
+// Phase 4 note: operator resolution moved to `lib/auth/getOperator.ts`
+// — session-scoped, backed by Supabase Auth. The pre-auth
+// `getOrCreateDevOperator` helper is gone; every function here expects
+// an already-resolved operator id.
 
 export async function listActiveMemories(operatorId: string) {
   const db = getDb();

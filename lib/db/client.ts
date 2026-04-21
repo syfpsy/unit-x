@@ -1,25 +1,34 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import * as schema from './schema';
 
 type DbClient = ReturnType<typeof drizzle<typeof schema>>;
 
-let cached: DbClient | null = null;
+let cachedSql: ReturnType<typeof postgres> | null = null;
+let cachedDb: DbClient | null = null;
 
 /**
- * Lazy-init Drizzle + Neon HTTP driver. Module-level eval would throw at
- * Next.js build time when DATABASE_URL isn't set; deferring to first use
- * means static routes and the home page still build cleanly when only the
- * API surface depends on Postgres.
+ * Lazy-init Drizzle + postgres.js. Supabase + Vercel serverless friendly:
+ *   - `prepare: false` avoids prepared-statement caching conflicts with
+ *     the connection pooler (pgBouncer transaction mode) that Supabase
+ *     uses by default.
+ *   - Eager import at module level would throw during `next build` when
+ *     DATABASE_URL is unset; deferring to first use lets static routes
+ *     build cleanly.
  */
 export function getDb(): DbClient {
-  if (cached) return cached;
+  if (cachedDb) return cachedDb;
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Provision a Postgres DB (Neon via Vercel) and add it to the env.',
+      'DATABASE_URL is not set. Provision Postgres via Vercel → Supabase integration, then vercel env pull.',
     );
   }
-  cached = drizzle(neon(url), { schema });
-  return cached;
+  cachedSql = postgres(url, {
+    prepare: false,
+    // one shared client per runtime worker — serverless-friendly
+    max: 1,
+  });
+  cachedDb = drizzle(cachedSql, { schema });
+  return cachedDb;
 }

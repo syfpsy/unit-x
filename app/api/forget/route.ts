@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { getOrCreateDevOperator, softForget } from '@/lib/db/ledger';
+import { getOperator } from '@/lib/auth/getOperator';
+import { softForget } from '@/lib/db/ledger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const op = await getOrCreateDevOperator();
+    const op = await getOperator();
+    if (!op) {
+      // Nothing to forget for an anonymous session.
+      return NextResponse.json({ forgotten: [] });
+    }
     const removedRows = await softForget({ operatorId: op.id, keyword });
     return NextResponse.json({
       forgotten: removedRows.map((r) => ({

@@ -42,3 +42,9 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# supabase CLI local state (we use Drizzle migrations, not supabase/migrations)
+supabase/.temp/
+supabase/.branches/
+supabase/functions/
+

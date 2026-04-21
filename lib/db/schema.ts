@@ -8,8 +8,10 @@ import { pgTable, uuid, varchar, text, timestamp, index } from 'drizzle-orm/pg-c
 
 export const operators = pgTable('operators', {
   id: uuid('id').primaryKey().defaultRandom(),
-  // Nullable until Phase 4 binds operators to verified email addresses.
-  email: varchar('email', { length: 320 }),
+  // FK to Supabase's auth.users(id). Enforced by a SQL constraint added in the
+  // Phase 4 migration (Drizzle doesn't express cross-schema FKs well).
+  authUserId: uuid('auth_user_id').notNull().unique(),
+  email: varchar('email', { length: 320 }).notNull(),
   handle: varchar('handle', { length: 80 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

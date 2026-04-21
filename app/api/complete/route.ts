@@ -1,9 +1,6 @@
 import type { NextRequest } from 'next/server';
-import {
-  getOrCreateDevOperator,
-  insertMemory,
-  insertMessage,
-} from '@/lib/db/ledger';
+import { getOperator } from '@/lib/auth/getOperator';
+import { insertMemory, insertMessage } from '@/lib/db/ledger';
 import type { MemoryTag } from '@/components/types';
 
 export const runtime = 'nodejs';
@@ -90,21 +87,21 @@ export async function POST(req: NextRequest) {
     return sseError(`upstream ${upstream.status}: ${detail || 'no body'}`, 502);
   }
 
-  // Resolve (or create) the dev operator so we can scope persistence. If the
-  // DB is unreachable we continue in stateless mode: the stream still works,
-  // just nothing is saved. The client already handles this gracefully since
-  // memory events still fire — they just won't survive a reload.
+  // Resolve the operator from the Supabase session. Unauthenticated visitors
+  // (explicit "skip — session only" path) run ephemerally: stream works,
+  // nothing is saved. Same degradation applies if the DB is unreachable.
   let operatorId: string | null = null;
   try {
-    const op = await getOrCreateDevOperator();
-    operatorId = op.id;
-    // Fire-and-forget the user's message; don't block the stream on this.
-    const userText = body.messages[body.messages.length - 1]?.content ?? '';
-    if (userText) {
-      void insertMessage({ operatorId, who: 'user', text: userText }).catch(() => {});
+    const op = await getOperator();
+    if (op) {
+      operatorId = op.id;
+      const userText = body.messages[body.messages.length - 1]?.content ?? '';
+      if (userText) {
+        void insertMessage({ operatorId, who: 'user', text: userText }).catch(() => {});
+      }
     }
   } catch {
-    // DB not configured — degrade gracefully.
+    // Auth or DB unreachable — degrade to stateless streaming.
   }
 
   const stream = transformUpstream(upstream.body, abort, operatorId);

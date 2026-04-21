@@ -1,24 +1,58 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
-type Step = 'prompt' | 'input' | 'sending' | 'verifying' | 'ok';
+type Step =
+  | 'prompt'
+  | 'choose' // picked Y; now choose between magic-link email or Google OAuth
+  | 'email' // collecting magic-link email
+  | 'sending' // dispatching to Supabase
+  | 'sent' // awaiting user to click email link
+  | 'oauth_redirect' // redirecting to Google
+  | 'ok' // session confirmed
+  | 'error';
 
 interface IdentifyProps {
-  onAccept: (addr: string) => void;
+  onAccept: (identity: { email: string; handle: string }) => void;
   onSkip: () => void;
+  initialError?: string | null;
 }
 
-export function Identify({ onAccept, onSkip }: IdentifyProps) {
-  const [step, setStep] = useState<Step>('prompt');
+export function Identify({ onAccept, onSkip, initialError }: IdentifyProps) {
+  const [step, setStep] = useState<Step>(initialError ? 'error' : 'prompt');
   const [addr, setAddr] = useState('');
+  const [errMsg, setErrMsg] = useState<string | null>(initialError ?? null);
   const answer = 'Y';
+
+  const supabase = useMemo(() => {
+    try {
+      return createSupabaseBrowserClient();
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Poll for an established session so the gate advances automatically
+  // after the user clicks their magic link in another tab.
+  useEffect(() => {
+    if (!supabase) return;
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const email = session.user.email ?? 'operator@nxyz.art';
+        const handle = (email.split('@')[0] || 'operator').toLowerCase();
+        setStep('ok');
+        setTimeout(() => onAccept({ email, handle }), 600);
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [supabase, onAccept]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (step === 'prompt') {
         if (e.key === 'y' || e.key === 'Y' || e.key === 'Enter') {
-          setStep('input');
+          setStep('choose');
           e.preventDefault();
         }
         if (e.key === 'n' || e.key === 'N') {
@@ -31,12 +65,50 @@ export function Identify({ onAccept, onSkip }: IdentifyProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [step, onSkip]);
 
-  const go = () => {
+  async function sendMagicLink() {
+    if (!supabase) {
+      setErrMsg('supabase client not available');
+      setStep('error');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) {
+      setErrMsg('that does not look like an address');
+      setStep('error');
+      return;
+    }
     setStep('sending');
-    setTimeout(() => setStep('verifying'), 700);
-    setTimeout(() => setStep('ok'), 1500);
-    setTimeout(() => onAccept(addr || 'anon@nxyz.art'), 2100);
-  };
+    const { error } = await supabase.auth.signInWithOtp({
+      email: addr,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/confirm`,
+      },
+    });
+    if (error) {
+      setErrMsg(error.message.slice(0, 120));
+      setStep('error');
+      return;
+    }
+    setStep('sent');
+  }
+
+  async function signInWithGoogle() {
+    if (!supabase) {
+      setErrMsg('supabase client not available');
+      setStep('error');
+      return;
+    }
+    setStep('oauth_redirect');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      setErrMsg(error.message.slice(0, 120));
+      setStep('error');
+    }
+  }
 
   return (
     <div className="identify">
@@ -76,6 +148,7 @@ export function Identify({ onAccept, onSkip }: IdentifyProps) {
             >
               // sys
             </div>
+
             {step === 'prompt' && (
               <>
                 <div>a soul is a ledger of the people it has met.</div>
@@ -88,11 +161,21 @@ export function Identify({ onAccept, onSkip }: IdentifyProps) {
                 </div>
               </>
             )}
-            {step === 'input' && (
+
+            {step === 'choose' && (
               <>
-                <div>bind this session to an operator address.</div>
+                <div>bind this session to an operator.</div>
                 <div style={{ color: 'var(--phosphor-faint)', fontSize: 11 }}>
-                  a magic link will be issued. no password is stored.
+                  no password is stored. the ledger follows the operator across devices.
+                </div>
+              </>
+            )}
+
+            {step === 'email' && (
+              <>
+                <div>issue a magic link.</div>
+                <div style={{ color: 'var(--phosphor-faint)', fontSize: 11 }}>
+                  a single-use capsule will arrive by email. click it to bind.
                 </div>
                 <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ color: 'var(--violet)', fontWeight: 700 }}>operator&gt;</span>
@@ -100,7 +183,7 @@ export function Identify({ onAccept, onSkip }: IdentifyProps) {
                     autoFocus
                     value={addr}
                     onChange={(e) => setAddr(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && go()}
+                    onKeyDown={(e) => e.key === 'Enter' && sendMagicLink()}
                     placeholder="you@somewhere.net"
                     style={{
                       flex: 1,
@@ -115,32 +198,49 @@ export function Identify({ onAccept, onSkip }: IdentifyProps) {
                 </div>
               </>
             )}
+
             {step === 'sending' && (
               <div style={{ color: 'var(--phosphor-dim)' }}>
-                &gt; dispatching capsule to{' '}
-                <b style={{ color: 'var(--phosphor)' }}>{addr || 'anon@nxyz.art'}</b> ...
+                &gt; dispatching capsule to <b style={{ color: 'var(--phosphor)' }}>{addr}</b> ...
               </div>
             )}
-            {step === 'verifying' && (
+            {step === 'sent' && (
+              <>
+                <div style={{ color: 'var(--phosphor)' }}>
+                  &gt; capsule sent. check your inbox.
+                </div>
+                <div style={{ color: 'var(--phosphor-faint)', fontSize: 11 }}>
+                  click the link there. this panel will advance automatically.
+                </div>
+              </>
+            )}
+            {step === 'oauth_redirect' && (
               <div style={{ color: 'var(--phosphor-dim)' }}>
-                &gt; handshake received · verifying signature ...
+                &gt; handing off to google ...
               </div>
             )}
             {step === 'ok' && (
-              <div
-                style={{
-                  color: 'var(--violet)',
-                  textShadow: '0 0 6px var(--violet-glow)',
-                }}
-              >
+              <div style={{ color: 'var(--violet)', textShadow: '0 0 6px var(--violet-glow)' }}>
                 &gt; operator bound. soul path resolved.
               </div>
+            )}
+            {step === 'error' && (
+              <>
+                <div style={{ color: 'var(--hostile)' }}>
+                  &gt; handshake refused.
+                </div>
+                {errMsg && (
+                  <div style={{ color: 'var(--hostile)', fontSize: 11, opacity: 0.8 }}>
+                    {errMsg}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {step === 'prompt' && (
             <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-              <button className="term-btn primary" onClick={() => setStep('input')}>
+              <button className="term-btn primary" onClick={() => setStep('choose')}>
                 [Y] proceed
               </button>
               <button className="term-btn" onClick={onSkip}>
@@ -148,13 +248,57 @@ export function Identify({ onAccept, onSkip }: IdentifyProps) {
               </button>
             </div>
           )}
-          {step === 'input' && (
+          {step === 'choose' && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+              <button className="term-btn primary" onClick={signInWithGoogle}>
+                ◆ google
+              </button>
+              <button className="term-btn primary" onClick={() => setStep('email')}>
+                ◆ magic link
+              </button>
+              <button className="term-btn" onClick={() => setStep('prompt')}>
+                back
+              </button>
+            </div>
+          )}
+          {step === 'email' && (
             <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-              <button className="term-btn primary" onClick={go}>
+              <button className="term-btn primary" onClick={sendMagicLink}>
                 ↵  issue capsule
               </button>
+              <button className="term-btn" onClick={() => setStep('choose')}>
+                back
+              </button>
+            </div>
+          )}
+          {step === 'sent' && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button
+                className="term-btn"
+                onClick={() => {
+                  setStep('email');
+                }}
+              >
+                resend
+              </button>
               <button className="term-btn" onClick={onSkip}>
-                cancel
+                skip — session only
+              </button>
+            </div>
+          )}
+          {step === 'error' && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button
+                className="term-btn primary"
+                onClick={() => {
+                  setErrMsg(null);
+                  setStep('choose');
+                }}
+              >
+                retry
+              </button>
+              <button className="term-btn" onClick={onSkip}>
+                skip — session only
               </button>
             </div>
           )}
