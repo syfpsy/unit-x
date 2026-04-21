@@ -101,6 +101,7 @@ export function App() {
   const [tweaks, setTweaks] = useState<TweakState>(TWEAK_DEFAULTS);
   const [tweaksOpen, setTweaksOpen] = useState(false);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [operatorCreatedAt, setOperatorCreatedAt] = useState<Date | null>(null);
   const [evolution, setEvolution] = useState<EvolutionState | null>(null);
   const [equipped, setEquipped] = useState<Record<string, { slug: string; name: string; payload: CosmeticPayload }>>({});
@@ -139,6 +140,37 @@ export function App() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Surface auth errors that Supabase tacked onto the landing URL and
+  // scrub them so a refresh doesn't replay. Handles three shapes:
+  //   ?auth_error=…            (our own /auth/confirm passthrough)
+  //   ?error_description=…     (Supabase falls back to Site URL with
+  //                             error params when redirect_to isn't on
+  //                             the allowlist or the token expired)
+  //   #error_description=…     (implicit flow hash fragment)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const fromQuery =
+      url.searchParams.get('auth_error') ??
+      url.searchParams.get('error_description');
+    const fromHash = (() => {
+      if (!url.hash.startsWith('#')) return null;
+      const params = new URLSearchParams(url.hash.slice(1));
+      return params.get('error_description');
+    })();
+    const msg = fromQuery ?? fromHash;
+    if (msg) {
+      setAuthError(msg);
+      // Scrub so refresh doesn't re-trigger.
+      url.searchParams.delete('auth_error');
+      url.searchParams.delete('error');
+      url.searchParams.delete('error_code');
+      url.searchParams.delete('error_description');
+      url.hash = '';
+      window.history.replaceState({}, '', url.toString());
+    }
   }, []);
 
   // Hydrate tweaks from localStorage on mount. Older stored shapes may not
@@ -537,6 +569,7 @@ export function App() {
         )}
         {stage === 'identify' && (
           <Identify
+            initialError={authError}
             onAccept={(identity) => {
               setOperator(identity.email);
               setStage('live');
