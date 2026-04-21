@@ -550,6 +550,23 @@ novel later:
   Live at https://unit-x-eta.vercel.app. Magic link works out of the
   box; Google OAuth requires one-time configuration in the Supabase
   dashboard + Google Cloud (see next-steps note in agent memory).
+- **2026-04-22** — Phase 8 shipped. Hardening layer.
+  In-memory token-bucket rate limits on `/api/complete` (15 burst,
+  15/min), `/api/forget` (5 burst, 6/min), `/api/export` (3 burst,
+  1/min), `/api/delete-account` (1/min, no burst). Structured JSON
+  logger (`lib/logger.ts`) with aggressive redaction — content fields
+  and anything matching `sk-*` or JWT shape are stripped before
+  stringify. `/api/health` exposes DB reachability + env-var presence
+  checks with 503 on any fail. GDPR surfaces: `/api/export` streams a
+  decrypted JSON of the operator's full ledger; `/api/delete-account`
+  requires a typed `DELETE MY SOUL` phrase and hard-deletes the
+  operators row + Supabase auth.users (cascades clear everything).
+  `/export` and `/delete-account` slashes + HELP_TEXT + hints-bar
+  entry. Retention cron at `/api/cron/retention` runs daily at 04:17
+  UTC via `vercel.json`, overwriting ciphertext for memories past the
+  30-day grace window; gated by `CRON_SECRET`. Full rotation + recovery
+  rituals written up in `docs/RUNBOOK.md`. Smoke on prod: health OK,
+  unauth endpoints return proper 400/401, no regressions.
 - **2026-04-21** — Phase 7 shipped. ASCII cosmetics + unlock system.
   Schema: `cosmetics` catalogue (seeded from migrations, never mutated at
   runtime) + `operator_cosmetics` ownership table, both RLS-enabled.
