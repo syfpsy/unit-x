@@ -1,4 +1,15 @@
-import { pgTable, uuid, varchar, text, timestamp, index } from 'drizzle-orm/pg-core';
+import { customType, pgTable, uuid, varchar, timestamp, index } from 'drizzle-orm/pg-core';
+
+/**
+ * Drizzle doesn't ship a first-class bytea type — this custom type bridges
+ * Postgres `bytea` and Node `Buffer`. postgres.js returns bytea columns as
+ * Buffer already, so no runtime marshalling is needed.
+ */
+const bytea = customType<{ data: Buffer; notNull: true; default: false }>({
+  dataType() {
+    return 'bytea';
+  },
+});
 
 /**
  * Phase 3 schema: no auth yet — a single "dev" operator row is created on
@@ -25,7 +36,9 @@ export const messages = pgTable(
       .references(() => operators.id, { onDelete: 'cascade' }),
     // 'user' | 'agent' | 'sys' — matches the client `Who` union.
     who: varchar('who', { length: 8 }).notNull(),
-    text: text('text').notNull(),
+    // Encrypted content (ciphertext ‖ auth tag). See lib/crypto/cipher.ts.
+    textCipher: bytea('text_cipher').notNull(),
+    nonce: bytea('nonce').notNull(),
     ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('messages_operator_ts_idx').on(t.operatorId, t.ts)],
@@ -40,9 +53,12 @@ export const memories = pgTable(
       .references(() => operators.id, { onDelete: 'cascade' }),
     // 'fact' | 'rel' | 'thread' | 'feeling' — mirrored from the client.
     tag: varchar('tag', { length: 10 }).notNull(),
-    text: varchar('text', { length: 200 }).notNull(),
+    // Encrypted content (ciphertext ‖ auth tag). See lib/crypto/cipher.ts.
+    textCipher: bytea('text_cipher').notNull(),
+    nonce: bytea('nonce').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Soft-delete tombstone. /forget flips this; active ledger queries filter it out.
+    // Phase 8 retention sweep overwrites text_cipher with zeros after a grace period.
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [index('memories_operator_active_idx').on(t.operatorId, t.deletedAt)],

@@ -232,13 +232,16 @@ export function App() {
   }, []);
 
   function doSave() {
-    triggerSaveFlash('◆ soul · committed');
+    // Phase 5: messages and memories auto-persist on every turn, encrypted
+    // at rest. /save is kept for muscle memory — it's now an acknowledgement
+    // of the current sync state, not an action.
+    triggerSaveFlash('◆ soul · synced');
     setMessages((ms) => [
       ...ms,
       {
         id: Date.now(),
         who: 'sys',
-        text: '> committed — thread flushed to /soul/',
+        text: '> already on /soul/. every turn is committed as it happens.',
         ts: Date.now(),
       },
     ]);

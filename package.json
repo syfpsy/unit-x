@@ -10,7 +10,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.mjs",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "keys:rotate": "node scripts/rotate-keys.mjs",
+    "retention:sweep": "node scripts/retention-sweep.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
