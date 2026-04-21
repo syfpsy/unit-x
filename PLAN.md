@@ -550,6 +550,25 @@ novel later:
   Live at https://unit-x-eta.vercel.app. Magic link works out of the
   box; Google OAuth requires one-time configuration in the Supabase
   dashboard + Google Cloud (see next-steps note in agent memory).
+- **2026-04-21** — Phase 7 shipped. ASCII cosmetics + unlock system.
+  Schema: `cosmetics` catalogue (seeded from migrations, never mutated at
+  runtime) + `operator_cosmetics` ownership table, both RLS-enabled.
+  Seed set = 6 items: 3 mascots (default / rooted / sentinel) + 3 boot
+  banners (classic / rem.v2 / minimal). Unlock rule DSL is a pure
+  evaluator (`lib/cosmetics/evaluate.ts`) with five rule types —
+  `always`, `tenure_days`, `memories_total`, `memories_by_tag`,
+  `stage_reached`. `/api/ledger` runs detect-and-persist on every load,
+  surfaces `newlyUnlockedSlugs` for a one-shot celebration (2.4s after
+  load, staggered behind stage-up). `/api/gallery` is a pure read;
+  `/api/equip` enforces one-per-kind. `<Gallery>` modal mirrors the
+  `/soul` aesthetic and reports unlock hints under locked items.
+  Mascot accepts a `templateOverride`; Boot accepts custom `lines` and
+  reads from a localStorage read-through cache so the equipped banner
+  appears on next session (boot runs before any network call).
+  `/gallery` slash + HELP_TEXT + hints-bar entry wired in. Live
+  seeded-operator E2E (`scripts/smoke-cosmetics.mjs`) confirms
+  catalogue sizing, unlock detection, ownership insertion, and
+  one-per-kind equip exclusivity.
 - **2026-04-21** — Phase 6 shipped. Evolution engine live.
   `lib/evolution.ts` is a pure function (runs on both sides) that maps
   (tenure, active memory count, last-interaction recency) → one of five
