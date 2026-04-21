@@ -1,7 +1,7 @@
 export type Who = 'user' | 'agent' | 'sys';
 
 export interface Message {
-  id: number;
+  id: string | number;
   who: Who;
   text: string;
   ts: number;
@@ -10,7 +10,8 @@ export interface Message {
 export type MemoryTag = 'fact' | 'rel' | 'thread' | 'feeling';
 
 export interface Memory {
-  id: number;
+  /** UUID string when hydrated from DB; numeric timestamp when created client-side. */
+  id: string | number;
   text: string;
   tag: MemoryTag;
   ts: number;

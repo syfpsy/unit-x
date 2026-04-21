@@ -121,6 +121,37 @@ export function App() {
     }
   }, []);
 
+  // Once the app enters the live stage, pull the persisted ledger so the
+  // side panel and system prompt reflect everything the unit has learned
+  // across prior sessions. Silent on failure — DB may be unconfigured.
+  useEffect(() => {
+    if (stage !== 'live') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/ledger');
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          memories: Array<{ id: string; tag: Memory['tag']; text: string; ts: number }>;
+        };
+        if (cancelled || !Array.isArray(body.memories)) return;
+        setMemories(
+          body.memories.map((m) => ({
+            id: m.id,
+            tag: m.tag,
+            text: m.text,
+            ts: m.ts,
+          })),
+        );
+      } catch {
+        // ignore — offline or DB down; chat still works statelessly
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stage]);
+
   useEffect(() => {
     applyPhosphor(tweaks.phosphor);
     applyCRT(tweaks.crt, tweaks.crtToggles);

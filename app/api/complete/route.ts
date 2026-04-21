@@ -1,4 +1,10 @@
 import type { NextRequest } from 'next/server';
+import {
+  getOrCreateDevOperator,
+  insertMemory,
+  insertMessage,
+} from '@/lib/db/ledger';
+import type { MemoryTag } from '@/components/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -84,7 +90,24 @@ export async function POST(req: NextRequest) {
     return sseError(`upstream ${upstream.status}: ${detail || 'no body'}`, 502);
   }
 
-  const stream = transformUpstream(upstream.body, abort);
+  // Resolve (or create) the dev operator so we can scope persistence. If the
+  // DB is unreachable we continue in stateless mode: the stream still works,
+  // just nothing is saved. The client already handles this gracefully since
+  // memory events still fire — they just won't survive a reload.
+  let operatorId: string | null = null;
+  try {
+    const op = await getOrCreateDevOperator();
+    operatorId = op.id;
+    // Fire-and-forget the user's message; don't block the stream on this.
+    const userText = body.messages[body.messages.length - 1]?.content ?? '';
+    if (userText) {
+      void insertMessage({ operatorId, who: 'user', text: userText }).catch(() => {});
+    }
+  } catch {
+    // DB not configured — degrade gracefully.
+  }
+
+  const stream = transformUpstream(upstream.body, abort, operatorId);
 
   return new Response(stream, {
     status: 200,
@@ -100,6 +123,7 @@ export async function POST(req: NextRequest) {
 function transformUpstream(
   upstream: ReadableStream<Uint8Array>,
   abort: AbortController,
+  operatorId: string | null,
 ): ReadableStream<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -108,6 +132,9 @@ function transformUpstream(
   let buffer = '';
   // How many chars of `buffer` have already been emitted to the client as chunks.
   let emitted = 0;
+  // Mirror of `buffer` with all <remember> tags stripped, used to persist the
+  // agent's final displayed text when the stream closes.
+  let cleanText = '';
 
   function send(ctrl: ReadableStreamDefaultController<Uint8Array>, evt: SseEvent) {
     ctrl.enqueue(encoder.encode(`data: ${JSON.stringify(evt)}\n\n`));
@@ -179,8 +206,20 @@ function transformUpstream(
     }
     out += safeOut;
 
-    if (out) send(ctrl, { type: 'chunk', text: out });
-    for (const evt of memEvents) send(ctrl, evt);
+    if (out) {
+      send(ctrl, { type: 'chunk', text: out });
+      cleanText += out;
+    }
+    for (const evt of memEvents) {
+      send(ctrl, evt);
+      if (operatorId) {
+        void insertMemory({
+          operatorId,
+          tag: evt.tag as MemoryTag,
+          text: evt.text,
+        }).catch(() => {});
+      }
+    }
 
     // Advance emitted pointer past everything we just shipped.
     emitted = buffer.length - held.length;
@@ -223,6 +262,13 @@ function transformUpstream(
         }
         drain(controller, true);
         send(controller, { type: 'done' });
+        if (operatorId && cleanText.trim()) {
+          void insertMessage({
+            operatorId,
+            who: 'agent',
+            text: cleanText.trim(),
+          }).catch(() => {});
+        }
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
           send(controller, {

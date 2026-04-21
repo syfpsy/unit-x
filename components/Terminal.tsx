@@ -322,20 +322,46 @@ export function Terminal({
   useEffect(() => {
     if (!forgetPending) return;
     if (forgetPending.count <= 0) {
-      setMemories((ms) =>
-        ms.filter((m) => !forgetPending.matches.find((x) => x.id === m.id)),
-      );
-      setMessages((ms) => [
-        ...ms,
-        {
-          id: Date.now(),
-          who: 'sys',
-          text: `> forgotten. ${forgetPending.matches.length} entrie(s) excised from /soul/.`,
-          ts: Date.now(),
-        },
-      ]);
+      const keyword = forgetPending.arg;
+      const targetIds = new Set(forgetPending.matches.map((x) => x.id));
+      // Optimistic local excision
+      setMemories((ms) => ms.filter((m) => !targetIds.has(m.id)));
       triggerGlitch();
       setForgetPending(null);
+      // Ask the server to soft-delete. If the DB is reachable, its authoritative
+      // count is what we report; if it fails, we keep the optimistic update.
+      (async () => {
+        try {
+          const res = await fetch('/api/forget', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword }),
+          });
+          const data = await res.json().catch(() => ({}));
+          const count = Array.isArray(data?.forgotten)
+            ? data.forgotten.length
+            : forgetPending.matches.length;
+          setMessages((ms) => [
+            ...ms,
+            {
+              id: Date.now(),
+              who: 'sys',
+              text: `> forgotten. ${count} entrie(s) excised from /soul/.`,
+              ts: Date.now(),
+            },
+          ]);
+        } catch {
+          setMessages((ms) => [
+            ...ms,
+            {
+              id: Date.now(),
+              who: 'sys',
+              text: `> forgotten locally · ${forgetPending.matches.length} entrie(s). (server unreachable — re-sync pending.)`,
+              ts: Date.now(),
+            },
+          ]);
+        }
+      })();
       return;
     }
     const t = setTimeout(
