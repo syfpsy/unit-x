@@ -550,3 +550,18 @@ novel later:
   Live at https://unit-x-eta.vercel.app. Magic link works out of the
   box; Google OAuth requires one-time configuration in the Supabase
   dashboard + Google Cloud (see next-steps note in agent memory).
+- **2026-04-21** — Phase 5 shipped. Envelope encryption at rest.
+  `UNITX_MASTER_KEY` (32 bytes, base64) lives in Vercel env only.
+  HKDF-SHA256 derives a per-operator DEK (salt = operator_id UUID,
+  info = "unitx-dek-v1"); AES-256-GCM with a random 96-bit nonce per
+  row. Storage: `text_cipher bytea` holds ciphertext ‖ auth tag; `nonce
+  bytea` is 12 bytes. `messages` and `memories` both migrated; the
+  prior plaintext `text` columns are dropped. Rotation-aware:
+  `UNITX_MASTER_KEY_PREV` is tried as a fallback on decrypt, and
+  `scripts/rotate-keys.mjs` re-wraps every row in a single pass.
+  `scripts/retention-sweep.mjs` zeros soft-deleted memory ciphertext
+  past a 30-day grace window (scheduling punted to Phase 8). `/save`
+  is now honest about already-synced state. `softForget` fetches +
+  decrypts + filters in memory (SQL LIKE is impossible against
+  ciphertext). End-to-end verified against live Supabase via
+  `scripts/smoke-encrypt.mjs` — raw DB row contains only ciphertext.
