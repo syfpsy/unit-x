@@ -550,6 +550,21 @@ novel later:
   Live at https://unit-x-eta.vercel.app. Magic link works out of the
   box; Google OAuth requires one-time configuration in the Supabase
   dashboard + Google Cloud (see next-steps note in agent memory).
+- **2026-04-21** — Phase 6 shipped. Evolution engine live.
+  `lib/evolution.ts` is a pure function (runs on both sides) that maps
+  (tenure, active memory count, last-interaction recency) → one of five
+  stages: initialising, acquainted, familiar, companion, attuned.
+  Stage triggers on `max(tenure, depth)`; recency modulates voice but
+  never stage. New `stage_transitions(operator_id, stage, reached_at)`
+  table with composite PK + RLS records first-time entries; the client
+  fires a one-shot celebration when `/api/ledger` returns a `stageUp`.
+  `<Mascot>` renders one of 5 ASCII templates (accretive: antenna →
+  refined border → aureole). `buildSystemPrompt` appends stage-specific
+  tonal addendums and a recency note if the operator has been silent
+  for >60 days. SidePanel exposes `stage · title`, tenure, and an `evo`
+  progress bar. 9 boundary unit cases pass; seeded E2E against live
+  Supabase confirms a backdated operator lands at stage 4 with all 5
+  transition rows written and idempotent on replay.
 - **2026-04-21** — Phase 5 shipped. Envelope encryption at rest.
   `UNITX_MASTER_KEY` (32 bytes, base64) lives in Vercel env only.
   HKDF-SHA256 derives a per-operator DEK (salt = operator_id UUID,
