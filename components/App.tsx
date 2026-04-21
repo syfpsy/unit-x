@@ -219,6 +219,15 @@ export function App() {
             </span>
             <span>ch.07</span>
             <span suppressHydrationWarning>{clockLabel}</span>
+            <button
+              type="button"
+              className={`tweaks-btn ${tweaksOpen ? 'open' : ''}`}
+              onClick={() => setTweaksOpen((o) => !o)}
+              title="tweaks — shift+?"
+              aria-label="tweaks"
+            >
+              ◆ tweaks
+            </button>
           </div>
         </div>
 
@@ -279,6 +288,9 @@ export function App() {
               </span>
               <span>
                 <kbd>esc</kbd>close
+              </span>
+              <span>
+                <kbd>shift+?</kbd>tweaks
               </span>
               <span style={{ marginLeft: 'auto', color: 'var(--violet)' }}>
                 ◆ {tweaks.unitName} · bound to {operator || 'session'}

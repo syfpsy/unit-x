@@ -532,6 +532,35 @@ html, body {
 *::-webkit-scrollbar-thumb { background: var(--border); }
 *::-webkit-scrollbar-thumb:hover { background: var(--phosphor-dim); }
 
+/* tweaks toggle in topbar */
+.tweaks-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--phosphor-dim);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms, background 120ms;
+}
+.tweaks-btn:hover {
+  color: var(--violet);
+  border-color: var(--violet);
+  background: var(--violet-soft);
+}
+.tweaks-btn.open {
+  color: var(--violet);
+  border-color: var(--violet);
+  background: var(--violet-soft);
+  text-shadow: 0 0 6px var(--violet-glow);
+}
+
 /* buttons in identify */
 .term-btn {
   display: inline-block;
