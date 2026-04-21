@@ -21,11 +21,11 @@ interface CompleteBody {
 
 type SseEvent =
   | { type: 'chunk'; text: string }
-  | { type: 'memory'; tag: 'fact' | 'rel' | 'thread' | 'feeling'; text: string }
+  | { type: 'memory'; tag: 'fact' | 'rel' | 'thread' | 'feeling' | 'world'; text: string }
   | { type: 'done' }
   | { type: 'error'; message: string };
 
-const REMEMBER_REGEX = /<remember\s+tag="(fact|rel|thread|feeling)">([\s\S]+?)<\/remember>/gi;
+const REMEMBER_REGEX = /<remember\s+tag="(fact|rel|thread|feeling|world)">([\s\S]+?)<\/remember>/gi;
 const REMEMBER_OPENER = '<remember';
 
 /**
@@ -192,7 +192,7 @@ function transformUpstream(
       out += unsent.slice(lastEnd, match.index);
       memEvents.push({
         type: 'memory',
-        tag: match[1] as 'fact' | 'rel' | 'thread' | 'feeling',
+        tag: match[1] as 'fact' | 'rel' | 'thread' | 'feeling' | 'world',
         text: match[2].trim().slice(0, 80),
       });
       lastEnd = match.index + match[0].length;

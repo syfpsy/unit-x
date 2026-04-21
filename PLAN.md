@@ -550,6 +550,32 @@ novel later:
   Live at https://unit-x-eta.vercel.app. Magic link works out of the
   box; Google OAuth requires one-time configuration in the Supabase
   dashboard + Google Cloud (see next-steps note in agent memory).
+- **2026-04-22** — Phase 11 shipped. Continuity made visible.
+  Three sub-phases in one push:
+  - **11.1 Mode expansion** — `MascotState` gains `dreaming` and
+    `recovering`. `dreaming` fires during `/dream` with half-closed
+    eye (`⊖`) and a drifting mouth (`∼∽∼∽∼` cycle). `recovering`
+    auto-fires for 2.4s after any `triggerGlitch` — error state with
+    `╳` eyes and `╌╌╌╌╌` mouth — then fades to idle unless the user
+    started a new action. Both respect `prefers-reduced-motion`.
+  - **11.2 Timeline** — `/api/timeline` returns a unified artifact
+    feed merging operator bind date + `stage_transitions` +
+    `operator_cosmetics`. `<Timeline>` modal + `/timeline` slash +
+    hints-bar entry. Visible continuity: every milestone the
+    operator has crossed, chronologically, with dates and "Xd ago".
+    Easy to extend — new sources slot in as long as they match the
+    `TimelineEntry` shape.
+  - **11.3 World memory** — added `world` as a fifth `<remember>`
+    tag. Not for facts about the operator; for what the unit has
+    noticed about itself and its shared context with them ("we speak
+    mostly late at night"). Server regex, prompt schema, SoulDoc
+    partition all updated. Also added an `emotional weather` section
+    to SoulDoc since `feeling` rows were previously only showing in
+    `recent`.
+  Architecture note updated: Memory categories section moves from
+  "planned" to "shipped"; Modes section reflects the two new states
+  + flags `focused` as needing a trigger policy before it ships;
+  commands-as-rituals table adds `/timeline`.
 - **2026-04-22** — Phase 10 shipped. Slot-based portrait system.
   Nine composable slots (`overhead / antenna / crown / body /
   inner_jaw / base_cap / neck / base_plate / under`) with a variant

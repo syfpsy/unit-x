@@ -17,6 +17,7 @@ const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
   { cmd: '/help', desc: 'show this list' },
   { cmd: '/soul', desc: 'open the soul.md ledger' },
   { cmd: '/gallery', desc: 'open the cosmetic wardrobe' },
+  { cmd: '/timeline', desc: 'see the record of what you have earned' },
   { cmd: '/save', desc: 'commit current thread to /soul/' },
   { cmd: '/clear', desc: 'wipe visible scroll (memory persists)' },
   { cmd: '/who', desc: 'report identity + uptime' },
@@ -55,14 +56,22 @@ function buildSystemPrompt(
     ``,
     `MEMORY PROTOCOL — follow the schema exactly or the tag will be rejected.`,
     `Syntax:  <remember tag="TAG">PHRASE</remember>`,
-    `  - TAG must be EXACTLY one of: fact | rel | thread | feeling`,
+    `  - TAG must be EXACTLY one of: fact | rel | thread | feeling | world`,
     `  - Never put the phrase inside the tag attribute.`,
     `  - Never omit the closing </remember>.`,
     `  - PHRASE is a short noun phrase under 60 chars. No first-person voice.`,
+    `Tag meanings:`,
+    `  - fact    : something true about the operator themselves.`,
+    `  - rel     : a person or thing the operator cares about.`,
+    `  - thread  : an ongoing situation, project, or plotline.`,
+    `  - feeling : the operator's emotional state — their weather.`,
+    `  - world   : something about YOU (the unit) or the shared context`,
+    `              between you — not about the operator. use sparingly.`,
     `Examples of correct usage:`,
     `  <remember tag="rel">sister mira, estranged</remember>`,
     `  <remember tag="thread">interview with kestrel labs next week</remember>`,
     `  <remember tag="feeling">unease about returning home</remember>`,
+    `  <remember tag="world">we speak mostly late at night</remember>`,
     `Rules:`,
     `  - At most ONE tag per reply. Only when something is genuinely worth the ledger.`,
     `  - The tag itself will be stripped from display — do not wrap it in backticks or code blocks.`,
@@ -101,6 +110,7 @@ interface TerminalProps {
   bumpSpeak: () => void;
   openSoul: () => void;
   openGallery: () => void;
+  openTimeline: () => void;
   doSave: () => void;
   doClear: () => void;
   doLogout: () => void;
@@ -125,6 +135,7 @@ export function Terminal({
   bumpSpeak,
   openSoul,
   openGallery,
+  openTimeline,
   doSave,
   doClear,
   doLogout,
@@ -245,7 +256,10 @@ export function Terminal({
   }
 
   async function runDream() {
-    setMascotState('thinking');
+    // Enter dreaming directly — it has its own eye/mouth state.
+    // callModel flips to 'thinking' briefly inside its implementation,
+    // but dreams shouldn't look like a normal "parsing" pause.
+    setMascotState('dreaming');
     setMessages((ms) => [
       ...ms,
       {
@@ -546,6 +560,10 @@ export function Terminal({
       }
       if (cmd === '/gallery') {
         openGallery();
+        return;
+      }
+      if (cmd === '/timeline') {
+        openTimeline();
         return;
       }
       if (cmd === '/save') {

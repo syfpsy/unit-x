@@ -50,20 +50,47 @@ export function Mascot({
   }, [reduced]);
 
   useEffect(() => {
-    if (reduced || state !== 'speaking') {
+    // Frame cycling applies to speaking + dreaming. Both use the same
+    // tick but with different glyph vocabularies (see mouthChars below).
+    const animating = state === 'speaking' || state === 'dreaming';
+    if (reduced || !animating) {
       setFrame(0);
       return;
     }
-    const iv = setInterval(() => setFrame((f) => (f + 1) % 3), 120);
+    // Dreaming is slower + drifting; speaking is crisper.
+    const interval = state === 'dreaming' ? 260 : 120;
+    const iv = setInterval(() => setFrame((f) => (f + 1) % 3), interval);
     return () => clearInterval(iv);
   }, [state, speakingTick, reduced]);
 
-  const eyesChar = blink ? '-' : state === 'thinking' ? '◦' : '●';
+  const eyesChar = (() => {
+    if (blink) return '-';
+    switch (state) {
+      case 'thinking':   return '◦';
+      case 'dreaming':   return '⊖'; // half-closed — the unit is elsewhere
+      case 'recovering': return '╳'; // post-glitch; eyes briefly broken
+      case 'speaking':
+      case 'idle':
+      default:           return '●';
+    }
+  })();
+
   const mouthChars = (() => {
-    if (state === 'thinking') return reduced ? '·····' : '· · ·';
-    if (state !== 'speaking') return '─────';
-    if (reduced) return '▂▂▂▂▂';
-    return (['▁▁▁▁▁', '▂▃▂▃▂', '▁▂▃▂▁'] as const)[frame];
+    switch (state) {
+      case 'thinking':
+        return reduced ? '·····' : '· · ·';
+      case 'dreaming':
+        if (reduced) return '~~~~~';
+        return (['∼∽∼∽∼', '∽∼∽∼∽', '∼∽∼∽∼'] as const)[frame];
+      case 'recovering':
+        return '╌╌╌╌╌'; // dashed — signal intermittent
+      case 'speaking':
+        if (reduced) return '▂▂▂▂▂';
+        return (['▁▁▁▁▁', '▂▃▂▃▂', '▁▂▃▂▁'] as const)[frame];
+      case 'idle':
+      default:
+        return '─────';
+    }
   })();
 
   // Resolve the mascot template. Memoised so changing only eye/mouth

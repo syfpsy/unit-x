@@ -51,7 +51,7 @@ export const memories = pgTable(
     operatorId: uuid('operator_id')
       .notNull()
       .references(() => operators.id, { onDelete: 'cascade' }),
-    // 'fact' | 'rel' | 'thread' | 'feeling' — mirrored from the client.
+    // 'fact' | 'rel' | 'thread' | 'feeling' | 'world' — mirrored from the client.
     tag: varchar('tag', { length: 10 }).notNull(),
     // Encrypted content (ciphertext ‖ auth tag). See lib/crypto/cipher.ts.
     textCipher: bytea('text_cipher').notNull(),

@@ -13,6 +13,8 @@ export function SoulDoc({ operator, memories, onClose }: SoulDocProps) {
   const facts = memories.filter((m) => m.tag === 'fact');
   const relationships = memories.filter((m) => m.tag === 'rel');
   const threads = memories.filter((m) => m.tag === 'thread');
+  const feelings = memories.filter((m) => m.tag === 'feeling');
+  const world = memories.filter((m) => m.tag === 'world');
   const recent = memories.slice(-6).reverse();
 
   const header = `
@@ -125,6 +127,48 @@ export function SoulDoc({ operator, memories, onClose }: SoulDocProps) {
             </div>
           )}
           {threads.map((e) => (
+            <div key={e.id} className="soul-entry">
+              <span className="dt">{new Date(e.ts).toLocaleDateString()}</span>
+              <span className="tx">{e.text}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="soul-section">
+          <div className="shead">§ emotional weather</div>
+          {feelings.length === 0 && (
+            <div
+              style={{
+                color: 'var(--phosphor-faint)',
+                fontSize: 11,
+                fontStyle: 'italic',
+              }}
+            >
+              &gt; none yet
+            </div>
+          )}
+          {feelings.map((e) => (
+            <div key={e.id} className="soul-entry">
+              <span className="dt">{new Date(e.ts).toLocaleDateString()}</span>
+              <span className="tx">{e.text}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="soul-section">
+          <div className="shead">§ world · what the unit has noticed</div>
+          {world.length === 0 && (
+            <div
+              style={{
+                color: 'var(--phosphor-faint)',
+                fontSize: 11,
+                fontStyle: 'italic',
+              }}
+            >
+              &gt; none yet — the unit has not yet stepped back far enough to say
+            </div>
+          )}
+          {world.map((e) => (
             <div key={e.id} className="soul-entry">
               <span className="dt">{new Date(e.ts).toLocaleDateString()}</span>
               <span className="tx">{e.text}</span>

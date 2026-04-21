@@ -14,6 +14,7 @@ import { IdleReverie } from './IdleReverie';
 import { SidePanel } from './SidePanel';
 import { SoulDoc } from './SoulDoc';
 import { Terminal } from './Terminal';
+import { Timeline } from './Timeline';
 import { PHOSPHORS, Tweaks } from './Tweaks';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { computeEvolution, type EvolutionStage, type EvolutionState } from '@/lib/evolution';
@@ -106,6 +107,7 @@ export function App() {
   const [evolution, setEvolution] = useState<EvolutionState | null>(null);
   const [equipped, setEquipped] = useState<Record<string, { slug: string; name: string; payload: CosmeticPayload }>>({});
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [bootLines, setBootLines] = useState<ReadonlyArray<BootLine> | null>(null);
 
   // Boot runs before any network call, so the equipped banner for this
@@ -342,6 +344,13 @@ export function App() {
   const triggerGlitch = useCallback(() => {
     setBurstVariant('glitch');
     setGlitchKey((k) => k + 1);
+    // Mascot snaps to `recovering` for ~2.4s. If another mode change
+    // happens in the meantime (e.g. the user starts a new turn) the
+    // new state wins — we only reset-to-idle if we're still recovering.
+    setMascotState((prev) => (prev === 'idle' || prev === 'thinking' ? 'recovering' : prev));
+    setTimeout(() => {
+      setMascotState((prev) => (prev === 'recovering' ? 'idle' : prev));
+    }, 2400);
   }, []);
   const triggerSaveFlash = useCallback((text?: string) => {
     setFlashText(text || '◆ soul · committed');
@@ -357,6 +366,7 @@ export function App() {
         setSoulOpen(false);
         setTweaksOpen(false);
         setGalleryOpen(false);
+        setTimelineOpen(false);
       }
       if (e.key === '?' && e.shiftKey) setTweaksOpen((o) => !o);
     }
@@ -451,6 +461,7 @@ export function App() {
               bumpSpeak={bumpSpeak}
               openSoul={() => setSoulOpen(true)}
               openGallery={() => setGalleryOpen(true)}
+              openTimeline={() => setTimelineOpen(true)}
               doSave={doSave}
               doClear={doClear}
               doLogout={doLogout}
@@ -499,6 +510,9 @@ export function App() {
                 <kbd>/gallery</kbd>cosmetics
               </span>
               <span>
+                <kbd>/timeline</kbd>record
+              </span>
+              <span>
                 <kbd>/export</kbd>download</span>
               <span>
                 <kbd>esc</kbd>close
@@ -531,6 +545,8 @@ export function App() {
             onClose={() => setSoulOpen(false)}
           />
         )}
+
+        {timelineOpen && <Timeline onClose={() => setTimelineOpen(false)} />}
 
         {galleryOpen && (
           <Gallery

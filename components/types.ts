@@ -7,7 +7,7 @@ export interface Message {
   ts: number;
 }
 
-export type MemoryTag = 'fact' | 'rel' | 'thread' | 'feeling';
+export type MemoryTag = 'fact' | 'rel' | 'thread' | 'feeling' | 'world';
 
 export interface Memory {
   /** UUID string when hydrated from DB; numeric timestamp when created client-side. */
@@ -17,7 +17,12 @@ export interface Memory {
   ts: number;
 }
 
-export type MascotState = 'idle' | 'thinking' | 'speaking';
+export type MascotState =
+  | 'idle'
+  | 'thinking'
+  | 'speaking'
+  | 'dreaming'    // during /dream reverie — half-lidded eyes, flowing mouth
+  | 'recovering'; // brief state after a glitch/error — dim, post-shock
 
 export type Stage = 'boot' | 'identify' | 'live';
 

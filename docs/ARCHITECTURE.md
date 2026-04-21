@@ -107,52 +107,55 @@ interface PortraitSpec {
   "oversized aureole" that needs heavy borders to not look awkward),
   we'll add an `anchors` field and validate on equip.
 
-## Memory categories (planned split)
+## Memory categories (Phase 11)
 
-The current `memories` table covers four tags — `fact | rel | thread |
-feeling` — and does most of what we need. The target is a fuller
-split:
+Today covered by the `memories` table with five tags + existing
+companion tables:
 
 - **Session memory** — the current conversation (live in client state;
   not persisted).
-- **Personal memory** — operator facts (current `fact` tag).
-- **Relationship memory** — people + things they care about (current
-  `rel`).
-- **Project / thread memory** — ongoing situations (current `thread`).
-- **Emotional weather** — feelings, moods (current `feeling`).
-- **World / system memory** — things the unit knows about _itself_ and
-  its environment (not yet represented — candidate for Phase 11).
-- **Cosmetic / state memory** — already isolated in
-  `operator_cosmetics` + `stage_transitions`.
-- **Artifacts** (Phase 11 candidate) — visible, earned durable records
-  that live alongside memories: badges, relics, scars (from `/forget`),
-  timeline entries, essence captures. Raw rows in a table; some become
-  cosmetics; some appear in `/soul` under a new section.
+- **Personal memory** — operator facts (`fact` tag).
+- **Relationship memory** — people + things they care about (`rel`).
+- **Project / thread memory** — ongoing situations (`thread`).
+- **Emotional weather** — feelings, moods (`feeling`).
+- **World / system memory** — what the unit has noticed about itself
+  and its shared context with the operator (`world` tag — shipped
+  Phase 11). Not facts about the operator; things like "we speak
+  mostly late at night" or "the phosphor runs amber when I'm tired".
+- **Cosmetic / state memory** — `operator_cosmetics` +
+  `stage_transitions`.
+- **Artifacts** — the `/timeline` view (shipped Phase 11) surfaces
+  milestones as visible durable records: bind date, stage-ups,
+  cosmetic unlocks. Future additions (first dream, first forget,
+  anniversaries) can slot in with no schema change if derived from
+  existing tables, or with a lightweight `operator_events` table for
+  anything that isn't already recorded.
 
 **Raw history vs curated memory** — every message is already persisted
 as raw history (`messages`). Memories extracted via `<remember>` are
-the curated layer. When Phase 11 arrives we may add a third layer: the
-operator's own curations (a `/keep` command that promotes a line from
-the transcript into the ledger explicitly).
+the curated layer. An operator-curated third layer (a `/keep` command
+that promotes a transcript line into the ledger) is still on the
+table; no concrete plan yet.
 
-## Modes (planned expansion)
+## Modes (Phase 11 — dreaming + recovering shipped; focused pending)
 
-Today the mascot has three states: idle / thinking / speaking. The
-target is six, each affecting portrait state, voice, and available
-actions:
+Current mascot states and what fires them:
 
-| Mode        | Portrait                | Voice                               |
-|-------------|-------------------------|-------------------------------------|
-| standby     | breathing + soft glow   | base — short fragments              |
-| listening   | eyes focus              | no reply; log turns only            |
-| thinking    | pupils dilate (`◦`)     | `> parsing` placeholder             |
-| speaking    | mouth animation         | streaming reply                     |
-| dreaming    | eyes half-lidded (`⊖`)  | `~` prefix, free association        |
-| recovering  | flicker + dim phosphor  | shortened, terse, post-error        |
-| focused     | brighter eyes, frame    | longer tolerance, bigger context    |
+| Mode        | Eye   | Mouth        | Fires when                                     |
+|-------------|-------|--------------|------------------------------------------------|
+| idle        | `●`   | `─────`      | default                                        |
+| thinking    | `◦`   | `· · ·`      | `callModel` in flight before first chunk       |
+| speaking    | `●`   | animated ▁▃  | stream chunks arriving                         |
+| dreaming    | `⊖`   | animated ∼∽  | `/dream` slash running                         |
+| recovering  | `╳`   | `╌╌╌╌╌`      | `triggerGlitch` (error / SSE fault); 2.4s fade |
 
-These overlap our current cosmetic/evolution state. Adding them is a
-Shell + Mind change; Memory already has the structure.
+Still planned: `focused` (triggered by sustained session — lots of
+activity without an idle gap — extends tolerance for longer replies,
+brightens eyes). Needs a trigger policy before it's worth shipping
+(what counts as "sustained"?).
+
+Per the mascot rule, reduced-motion users see a still frame for
+dreaming + speaking animations.
 
 ## Commands as rituals, not flavour
 
@@ -168,15 +171,16 @@ rule going forward.
 | `/clear`           | Shell — local scroll wipe only              |
 | `/who`             | Memory read (identity)                      |
 | `/logout`          | Identity — session cookie clear             |
-| `/dream`           | Mind — reverie prompt                       |
+| `/dream`           | Mind — reverie prompt (+ dreaming mode)     |
 | `/essence`         | Mind — portrait-from-ledger prompt          |
 | `/forget <kw>`     | Memory write — soft-delete then sweep       |
+| `/timeline`        | Artifact read — milestones across layers    |
 | `/export`          | Memory read — full decrypt + download       |
 | `/delete-account`  | Identity + Memory — hard cascade            |
 
-Phase 10+ candidates: `/keep` (promote a transcript line to ledger),
-`/timeline` (visible artifact history), `/mode <name>` (explicit mode
-switch for debug / focus / dream).
+Phase 12+ candidates: `/keep` (promote a transcript line to ledger),
+`/mode <name>` (explicit mode switch for debug / focus), `/anniversary`
+(seasonal ritual).
 
 ## Data-driven over hardcoded
 
