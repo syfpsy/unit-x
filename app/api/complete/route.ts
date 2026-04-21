@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { getOperator } from '@/lib/auth/getOperator';
 import { insertMemory, insertMessage } from '@/lib/db/ledger';
+import { anonKey, checkRateLimit } from '@/lib/ratelimit';
+import { log } from '@/lib/logger';
 import type { MemoryTag } from '@/components/types';
 
 export const runtime = 'nodejs';
@@ -56,6 +58,39 @@ export async function POST(req: NextRequest) {
     return sseError('request must include { system, messages }', 400);
   }
 
+  // Resolve the operator once so the rate limiter, persistence writes,
+  // and stream transformer all share the same lookup. An auth failure
+  // downgrades to the anonymous (ephemeral) path.
+  let authedOperator: Awaited<ReturnType<typeof getOperator>> = null;
+  try {
+    authedOperator = await getOperator();
+  } catch {
+    authedOperator = null;
+  }
+
+  // Rate limit — keyed by operator if authed, IP otherwise. 15 burst,
+  // 15/minute sustained. Cheap in-memory token bucket (lib/ratelimit.ts);
+  // swap for @upstash/ratelimit if we ever need cross-worker state.
+  const rateKey = authedOperator ? `op:${authedOperator.id}` : anonKey(req);
+  const rl = checkRateLimit(rateKey, { capacity: 15, refillPerSec: 0.25 });
+  if (!rl.allowed) {
+    log.warn('complete rate-limited', { key: rateKey, retryMs: rl.retryAfterMs });
+    return new Response(
+      `data: ${JSON.stringify({
+        type: 'error',
+        message: `rate limited — retry in ${Math.ceil(rl.retryAfterMs / 1000)}s`,
+      })}\n\ndata: ${JSON.stringify({ type: 'done' })}\n\n`,
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)),
+        },
+      },
+    );
+  }
+
   const abort = new AbortController();
   req.signal.addEventListener('abort', () => abort.abort());
 
@@ -87,21 +122,16 @@ export async function POST(req: NextRequest) {
     return sseError(`upstream ${upstream.status}: ${detail || 'no body'}`, 502);
   }
 
-  // Resolve the operator from the Supabase session. Unauthenticated visitors
-  // (explicit "skip — session only" path) run ephemerally: stream works,
-  // nothing is saved. Same degradation applies if the DB is unreachable.
-  let operatorId: string | null = null;
-  try {
-    const op = await getOperator();
-    if (op) {
-      operatorId = op.id;
-      const userText = body.messages[body.messages.length - 1]?.content ?? '';
-      if (userText) {
-        void insertMessage({ operatorId, who: 'user', text: userText }).catch(() => {});
-      }
+  // Persist the user turn if we have an operator. Ephemeral visitors
+  // (skip path) just stream — nothing written to DB.
+  const operatorId: string | null = authedOperator?.id ?? null;
+  if (operatorId) {
+    const userText = body.messages[body.messages.length - 1]?.content ?? '';
+    if (userText) {
+      void insertMessage({ operatorId, who: 'user', text: userText }).catch((err) => {
+        log.warn('complete insertMessage failed', { err });
+      });
     }
-  } catch {
-    // Auth or DB unreachable — degrade to stateless streaming.
   }
 
   const stream = transformUpstream(upstream.body, abort, operatorId);

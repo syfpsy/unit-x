@@ -24,6 +24,8 @@ const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
   { cmd: '/dream', desc: 'request a dream — the unit reflects on accumulated weather' },
   { cmd: '/forget', desc: 'request deletion of a memory (irreversible)' },
   { cmd: '/essence', desc: 'draw a portrait of you from memory frequencies' },
+  { cmd: '/export', desc: 'download your full ledger (decrypted, json)' },
+  { cmd: '/delete-account', desc: 'permanently remove your soul and sign out' },
 ];
 
 function buildSystemPrompt(
@@ -296,6 +298,119 @@ export function Terminal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dreamTrigger]);
 
+  async function runExport() {
+    setMessages((ms) => [
+      ...ms,
+      {
+        id: Date.now(),
+        who: 'sys',
+        text: '> packaging ledger · decrypting under your operator key ...',
+        ts: Date.now(),
+      },
+    ]);
+    try {
+      const res = await fetch('/api/export', { method: 'POST' });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const cd = res.headers.get('Content-Disposition') ?? '';
+      const nameMatch = cd.match(/filename="([^"]+)"/);
+      a.href = url;
+      a.download = nameMatch?.[1] ?? 'unit-x-export.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessages((ms) => [
+        ...ms,
+        {
+          id: Date.now() + 1,
+          who: 'sys',
+          text: '> export sent to your downloads.',
+          ts: Date.now(),
+        },
+      ]);
+    } catch (err) {
+      triggerGlitch();
+      setMessages((ms) => [
+        ...ms,
+        {
+          id: Date.now() + 2,
+          who: 'sys',
+          text: `> export failed · ${String((err as Error).message).slice(0, 80)}`,
+          ts: Date.now(),
+        },
+      ]);
+    }
+  }
+
+  async function runDeleteAccount(arg: string) {
+    if (arg !== 'DELETE MY SOUL') {
+      setMessages((ms) => [
+        ...ms,
+        {
+          id: Date.now(),
+          who: 'sys',
+          text:
+            '> !!! DESTRUCTIVE · hard-delete every memory, every message, and unbind the operator.\n' +
+            '> no soft delete. no grace period. no recovery.\n' +
+            '> to proceed, type:  /delete-account DELETE MY SOUL',
+          ts: Date.now(),
+        },
+      ]);
+      return;
+    }
+    setMessages((ms) => [
+      ...ms,
+      {
+        id: Date.now(),
+        who: 'sys',
+        text: '> excising operator from every table ...',
+        ts: Date.now(),
+      },
+    ]);
+    try {
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'DELETE MY SOUL' }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `${res.status}`);
+      }
+      triggerGlitch();
+      setMessages((ms) => [
+        ...ms,
+        {
+          id: Date.now() + 1,
+          who: 'sys',
+          text: '> gone. the unit forgets. reloading ...',
+          ts: Date.now(),
+        },
+      ]);
+      setTimeout(() => {
+        // Ensure any cached client state goes with the session.
+        try {
+          localStorage.removeItem('equipped-banner-lines');
+        } catch {
+          // ignore
+        }
+        window.location.reload();
+      }, 1800);
+    } catch (err) {
+      triggerGlitch();
+      setMessages((ms) => [
+        ...ms,
+        {
+          id: Date.now() + 2,
+          who: 'sys',
+          text: `> delete refused · ${String((err as Error).message).slice(0, 80)}`,
+          ts: Date.now(),
+        },
+      ]);
+    }
+  }
+
   function handleForget(arg: string) {
     if (!arg) {
       setMessages((ms) => [
@@ -467,6 +582,14 @@ export function Terminal({
       }
       if (cmd === '/forget') {
         handleForget(arg);
+        return;
+      }
+      if (cmd === '/export') {
+        void runExport();
+        return;
+      }
+      if (cmd === '/delete-account') {
+        void runDeleteAccount(arg);
         return;
       }
       setMessages((ms) => [

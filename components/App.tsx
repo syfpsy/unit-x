@@ -499,6 +499,8 @@ export function App() {
                 <kbd>/gallery</kbd>cosmetics
               </span>
               <span>
+                <kbd>/export</kbd>download</span>
+              <span>
                 <kbd>esc</kbd>close
               </span>
               <span>
