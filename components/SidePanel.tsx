@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Mascot } from './Mascot';
 import type { MascotState, Memory } from './types';
+import type { EvolutionState } from '@/lib/evolution';
 
 interface SidePanelProps {
   operator: string | null;
@@ -10,6 +11,7 @@ interface SidePanelProps {
   mascotState: MascotState;
   speakingTick: number;
   sessionStart: number;
+  evolution: EvolutionState | null;
 }
 
 export function SidePanel({
@@ -18,6 +20,7 @@ export function SidePanel({
   mascotState,
   speakingTick,
   sessionStart,
+  evolution,
 }: SidePanelProps) {
   const [uptime, setUptime] = useState('00:00');
 
@@ -31,7 +34,14 @@ export function SidePanel({
     return () => clearInterval(iv);
   }, [sessionStart]);
 
-  const empathPct = Math.min(78 + Math.floor(memories.length * 1.2), 99);
+  // Empathy bar ties to memory depth pre-Phase 6; from Phase 6 onward it
+  // also reflects recency so a quiet operator drifts back toward baseline.
+  const empathPct = Math.min(
+    78 +
+      Math.floor(memories.length * 1.2) +
+      Math.round((evolution?.recencyFactor ?? 0.5) * 10),
+    99,
+  );
 
   return (
     <div
@@ -46,10 +56,16 @@ export function SidePanel({
       <div className="panel">
         <div className="panel-head">
           <span className="lead">unit // portrait</span>
-          <span className="meta">live</span>
+          <span className="meta">
+            {evolution ? `stage ${evolution.stage} · ${evolution.title}` : 'live'}
+          </span>
         </div>
         <div className="panel-body tight" style={{ overflow: 'hidden' }}>
-          <Mascot state={mascotState} speakingTick={speakingTick} />
+          <Mascot
+            state={mascotState}
+            speakingTick={speakingTick}
+            stage={evolution?.stage ?? 1}
+          />
         </div>
       </div>
 
@@ -68,6 +84,16 @@ export function SidePanel({
             <div className="v">/soul/{(operator || 'anon').split('@')[0]}.md</div>
             <div className="k">state</div>
             <div className="v">{mascotState.toUpperCase()}</div>
+            {evolution && (
+              <>
+                <div className="k">stage</div>
+                <div className="v accent">
+                  {evolution.stage} · {evolution.title}
+                </div>
+                <div className="k">tenure</div>
+                <div className="v">{evolution.tenureDays}d</div>
+              </>
+            )}
           </div>
           <div style={{ height: 10 }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -95,6 +121,18 @@ export function SidePanel({
               </div>
               <span className="num">{empathPct}%</span>
             </div>
+            {evolution && evolution.nextThreshold && (
+              <div className="bar">
+                <span className="label">evo</span>
+                <div className="track">
+                  <div
+                    className="fill v"
+                    style={{ width: `${Math.round(evolution.progressToNext * 100)}%` }}
+                  />
+                </div>
+                <span className="num">{Math.round(evolution.progressToNext * 100)}%</span>
+              </div>
+            )}
             <div className="bar">
               <span className="label">uplink</span>
               <div className="track">

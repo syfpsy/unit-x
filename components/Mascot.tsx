@@ -1,14 +1,18 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
+import { MASCOT_BY_STAGE } from './mascots/stages';
 import type { MascotState } from './types';
+import type { EvolutionStage } from '@/lib/evolution';
 
 interface MascotProps {
   state?: MascotState;
   speakingTick?: number;
+  /** Evolution stage drives the ASCII template. Defaults to stage 1 (base). */
+  stage?: EvolutionStage;
 }
 
-export function Mascot({ state = 'idle', speakingTick = 0 }: MascotProps) {
+export function Mascot({ state = 'idle', speakingTick = 0, stage = 1 }: MascotProps) {
   const [blink, setBlink] = useState(false);
   const [frame, setFrame] = useState(0);
 
@@ -43,24 +47,23 @@ export function Mascot({ state = 'idle', speakingTick = 0 }: MascotProps) {
       ? '· · ·'
       : '─────';
 
-  const face = `    ╭─────────────╮
-   ╱               ╲
-  ╱   ┌─┐     ┌─┐   ╲
- │    │E│     │E│    │
- │    └─┘     └─┘    │
-  ╲                 ╱
-   │    ${mouthChars}    │
-   │   ╲_______╱    │
-    ╲_____________╱
-        │ │││ │
-       ═╧═╧╧═╧═`;
-
-  const withEyes = face.split('E').map((seg, i, arr) => (
+  const template = MASCOT_BY_STAGE[stage] ?? MASCOT_BY_STAGE[1];
+  // Substitute the 5-char mouth first so it doesn't collide with the
+  // single-char `E` eye marker. `M` appears exactly once per template.
+  const withMouth = template.replace(/M/, mouthChars);
+  const withEyes = withMouth.split('E').map((seg, i, arr) => (
     <Fragment key={i}>
       {seg}
       {i < arr.length - 1 && <span className="eyes">{eyesChar}</span>}
     </Fragment>
   ));
+
+  const status =
+    state === 'speaking'
+      ? 'TRANSMITTING'
+      : state === 'thinking'
+      ? 'PROCESSING'
+      : 'STANDBY';
 
   return (
     <div className="mascot">
@@ -75,7 +78,7 @@ export function Mascot({ state = 'idle', speakingTick = 0 }: MascotProps) {
           marginTop: 6,
         }}
       >
-        {state === 'speaking' ? 'TRANSMITTING' : state === 'thinking' ? 'PROCESSING' : 'STANDBY'}
+        {status}
       </div>
     </div>
   );

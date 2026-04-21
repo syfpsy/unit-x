@@ -1,4 +1,4 @@
-import { customType, pgTable, uuid, varchar, timestamp, index } from 'drizzle-orm/pg-core';
+import { customType, integer, pgTable, primaryKey, uuid, varchar, timestamp, index } from 'drizzle-orm/pg-core';
 
 /**
  * Drizzle doesn't ship a first-class bytea type — this custom type bridges
@@ -62,4 +62,22 @@ export const memories = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [index('memories_operator_active_idx').on(t.operatorId, t.deletedAt)],
+);
+
+/**
+ * Records each time an operator crossed into a new evolution stage.
+ * Phase 6 uses this to fire the stage-up celebration exactly once per
+ * stage per operator — if the row already exists, the client has
+ * already seen the transition.
+ */
+export const stageTransitions = pgTable(
+  'stage_transitions',
+  {
+    operatorId: uuid('operator_id')
+      .notNull()
+      .references(() => operators.id, { onDelete: 'cascade' }),
+    stage: integer('stage').notNull(),
+    reachedAt: timestamp('reached_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.operatorId, t.stage] })],
 );

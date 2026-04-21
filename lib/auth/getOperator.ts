@@ -8,6 +8,7 @@ export interface Operator {
   authUserId: string;
   email: string;
   handle: string;
+  createdAt: Date;
 }
 
 /**
@@ -41,6 +42,7 @@ export async function getOperator(): Promise<Operator | null> {
       authUserId: row.authUserId,
       email: row.email,
       handle: row.handle,
+      createdAt: row.createdAt,
     };
   }
 
@@ -64,5 +66,6 @@ export async function getOperator(): Promise<Operator | null> {
     authUserId: created.authUserId,
     email: created.email,
     handle: created.handle,
+    createdAt: created.createdAt,
   };
 }

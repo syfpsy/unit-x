@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 import { complete } from '@/lib/claudeClient';
+import { stagePromptAddendum, type EvolutionState } from '@/lib/evolution';
 import type { MascotState, Memory, Message, Who } from './types';
 
 const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
@@ -28,12 +29,14 @@ function buildSystemPrompt(
   unitName: string,
   operator: string | null,
   memories: Memory[],
+  evolution: EvolutionState | null,
 ): string {
   const name = operator ? operator.split('@')[0] : 'an unbound operator';
   const soul =
     memories.length === 0
       ? '(ledger empty — this is the first meeting)'
       : memories.slice(-20).map((m) => `- [${m.tag}] ${m.text}`).join('\n');
+  const stagePart = evolution ? `\n\n${stagePromptAddendum(evolution)}` : '';
 
   return [
     `You are ${unitName.toUpperCase()}, a cognition unit. You inhabit an old CRT terminal.`,
@@ -61,7 +64,7 @@ function buildSystemPrompt(
     `  - At most ONE tag per reply. Only when something is genuinely worth the ledger.`,
     `  - The tag itself will be stripped from display — do not wrap it in backticks or code blocks.`,
     `  - If nothing is worth remembering, emit no tag at all.`,
-  ].join('\n');
+  ].join('\n') + stagePart;
 }
 
 function fmtTime(ts: number): string {
@@ -102,6 +105,7 @@ interface TerminalProps {
   lastActivityRef: RefObject<number>;
   dreamTrigger: number;
   clearDreamTrigger: () => void;
+  evolution: EvolutionState | null;
 }
 
 export function Terminal({
@@ -124,6 +128,7 @@ export function Terminal({
   lastActivityRef,
   dreamTrigger,
   clearDreamTrigger,
+  evolution,
 }: TerminalProps) {
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState<TypingState | null>(null);
@@ -180,7 +185,7 @@ export function Terminal({
       role: (m.who === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
       content: m.text,
     }));
-    const system = systemOverride || buildSystemPrompt(unitName, operator, memories);
+    const system = systemOverride || buildSystemPrompt(unitName, operator, memories, evolution);
 
     let started = false;
     const result = await complete({
@@ -246,7 +251,7 @@ export function Terminal({
       },
     ]);
     const system =
-      buildSystemPrompt(unitName, operator, memories) +
+      buildSystemPrompt(unitName, operator, memories, evolution) +
       `\n\nDREAM MODE: You are in a reverie. The operator is silent. Produce 3-6 short lines of internal monologue — fragments, half-thoughts, associations between memories in the ledger. Use ellipses. Sometimes lines break off. Begin each line with "~ " instead of "> ". Do not address the operator directly. Do not ask questions. Close with one line about what you hope they return to tell you.`;
     await callModel('dream.', system);
   }

@@ -15,6 +15,7 @@ import { SoulDoc } from './SoulDoc';
 import { Terminal } from './Terminal';
 import { PHOSPHORS, Tweaks } from './Tweaks';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { computeEvolution, type EvolutionStage, type EvolutionState } from '@/lib/evolution';
 import type {
   CRTMode,
   CRTToggles,
@@ -98,6 +99,8 @@ export function App() {
   const [tweaks, setTweaks] = useState<TweakState>(TWEAK_DEFAULTS);
   const [tweaksOpen, setTweaksOpen] = useState(false);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [operatorCreatedAt, setOperatorCreatedAt] = useState<Date | null>(null);
+  const [evolution, setEvolution] = useState<EvolutionState | null>(null);
 
   // Returning visitors with a live Supabase session skip the IDENTIFY gate —
   // the "it remembered me" moment is the whole point. Null while checking,
@@ -146,8 +149,8 @@ export function App() {
   }, []);
 
   // Once the app enters the live stage, pull the persisted ledger + operator
-  // identity from the Supabase-backed server. Silent on failure — the stream
-  // still works without persistence.
+  // identity + evolution state from the server. Silent on failure — the
+  // stream still works without persistence.
   useEffect(() => {
     if (stage !== 'live') return;
     let cancelled = false;
@@ -156,11 +159,16 @@ export function App() {
         const res = await fetch('/api/ledger');
         if (!res.ok) return;
         const body = (await res.json()) as {
-          operator: { handle: string; email: string } | null;
+          operator: { handle: string; email: string; createdAt: number } | null;
           memories: Array<{ id: string; tag: Memory['tag']; text: string; ts: number }>;
+          evolution: EvolutionState | null;
+          stageUp: { from: number; to: EvolutionStage } | null;
         };
         if (cancelled) return;
         if (body.operator?.email) setOperator(body.operator.email);
+        if (body.operator?.createdAt) {
+          setOperatorCreatedAt(new Date(body.operator.createdAt));
+        }
         if (Array.isArray(body.memories)) {
           setMemories(
             body.memories.map((m) => ({
@@ -171,6 +179,25 @@ export function App() {
             })),
           );
         }
+        if (body.evolution) setEvolution(body.evolution);
+        if (body.stageUp) {
+          const { from, to } = body.stageUp;
+          // Defer the celebration until after the typewriter has a chance to
+          // settle — feels less like a notification spam and more like an
+          // observation the unit makes at the start of the session.
+          setTimeout(() => {
+            triggerSaveFlash(`◆ stage reached · ${body.evolution?.title ?? 'stage ' + to}`);
+            setMessages((ms) => [
+              ...ms,
+              {
+                id: Date.now(),
+                who: 'sys',
+                text: `> ${body.evolution?.blurb ?? 'the unit has evolved.'}\n> (stage ${from < 0 ? 0 : from + 1} → ${to})`,
+                ts: Date.now(),
+              },
+            ]);
+          }, 1800);
+        }
       } catch {
         // ignore — offline or DB down; chat still works statelessly
       }
@@ -178,7 +205,40 @@ export function App() {
     return () => {
       cancelled = true;
     };
+    // triggerSaveFlash is stable; stage is the trigger we care about.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
+
+  // Live recompute: when the operator gains (or loses) a memory during the
+  // session, re-derive evolution client-side so the mascot/voice stay in
+  // sync without a network round-trip. The server still owns the
+  // authoritative record of stage transitions (written on next load).
+  useEffect(() => {
+    if (!operatorCreatedAt) return;
+    setEvolution((prev) => {
+      const last = messages.reduce<Date | null>((acc, m) => {
+        if (m.who !== 'user') return acc;
+        const d = new Date(m.ts);
+        return !acc || d > acc ? d : acc;
+      }, null);
+      const next = computeEvolution({
+        createdAt: operatorCreatedAt,
+        activeMemoryCount: memories.length,
+        lastInteractionAt: last,
+      });
+      // Avoid pointless re-renders when nothing changed.
+      if (
+        prev &&
+        prev.stage === next.stage &&
+        prev.depth === next.depth &&
+        prev.tenureDays === next.tenureDays &&
+        prev.recencyFactor === next.recencyFactor
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [memories, messages, operatorCreatedAt]);
 
   useEffect(() => {
     applyPhosphor(tweaks.phosphor);
@@ -318,6 +378,7 @@ export function App() {
               lastActivityRef={lastActivityRef}
               dreamTrigger={dreamTrigger}
               clearDreamTrigger={() => {}}
+              evolution={evolution}
             />
           </div>
           {layoutAttr !== 'solo' && (
@@ -328,6 +389,7 @@ export function App() {
                 mascotState={mascotState}
                 speakingTick={speakingTick}
                 sessionStart={sessionStart}
+                evolution={evolution}
               />
             </div>
           )}
