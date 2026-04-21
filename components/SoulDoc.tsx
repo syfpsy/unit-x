@@ -25,7 +25,12 @@ export function SoulDoc({ operator, memories, onClose }: SoulDocProps) {
    ╚══════════════════════════════════════════════════════════════╝`;
 
   return (
-    <div className="soul-doc">
+    <div
+      className="soul-doc"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`soul ledger for ${name}`}
+    >
       <div className="panel-head">
         <span className="lead">/ soul / {name}.md</span>
         <span className="meta">read-only · {memories.length} entries</span>

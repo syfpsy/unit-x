@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import { MASCOT_BY_STAGE } from './mascots/stages';
+import { usePrefersReducedMotion } from '@/lib/usePrefersReducedMotion';
 import type { MascotState } from './types';
 import type { EvolutionStage } from '@/lib/evolution';
 
@@ -27,8 +28,15 @@ export function Mascot({
 }: MascotProps) {
   const [blink, setBlink] = useState(false);
   const [frame, setFrame] = useState(0);
+  const reduced = usePrefersReducedMotion();
 
+  // Skip random blinks when the user prefers reduced motion — the
+  // `-` eye glyph would still flash every few seconds otherwise.
   useEffect(() => {
+    if (reduced) {
+      setBlink(false);
+      return;
+    }
     let t: ReturnType<typeof setTimeout>;
     const cycle = () => {
       const delay = 2200 + Math.random() * 3200;
@@ -40,24 +48,28 @@ export function Mascot({
     };
     cycle();
     return () => clearTimeout(t);
-  }, []);
+  }, [reduced]);
 
+  // Mouth-frame cycling only runs while the model is speaking AND the
+  // user hasn't asked for reduced motion. Static mouth (`─────`) remains
+  // rendered in either quieted state — the shape is still legible.
   useEffect(() => {
-    if (state !== 'speaking') {
+    if (reduced || state !== 'speaking') {
       setFrame(0);
       return;
     }
     const iv = setInterval(() => setFrame((f) => (f + 1) % 3), 120);
     return () => clearInterval(iv);
-  }, [state, speakingTick]);
+  }, [state, speakingTick, reduced]);
 
   const eyesChar = blink ? '-' : state === 'thinking' ? '◦' : '●';
-  const mouthChars =
-    state === 'speaking'
-      ? (['▁▁▁▁▁', '▂▃▂▃▂', '▁▂▃▂▁'] as const)[frame]
-      : state === 'thinking'
-      ? '· · ·'
-      : '─────';
+  const mouthChars = (() => {
+    if (state === 'thinking') return reduced ? '·····' : '· · ·';
+    if (state !== 'speaking') return '─────';
+    // speaking + reduced motion → hold a single frame that reads as "mouth open".
+    if (reduced) return '▂▂▂▂▂';
+    return (['▁▁▁▁▁', '▂▃▂▃▂', '▁▂▃▂▁'] as const)[frame];
+  })();
 
   const template = templateOverride ?? MASCOT_BY_STAGE[stage] ?? MASCOT_BY_STAGE[1];
   // Substitute the 5-char mouth first so it doesn't collide with the
@@ -78,9 +90,15 @@ export function Mascot({
       : 'STANDBY';
 
   return (
-    <div className="mascot">
+    <div
+      className="mascot"
+      role="img"
+      aria-label={`UNIT-X · ${status.toLowerCase()}`}
+    >
       <div className="breathing">
-        <pre style={{ margin: 0 }}>{withEyes}</pre>
+        <pre style={{ margin: 0 }} aria-hidden="true">
+          {withEyes}
+        </pre>
       </div>
       <div
         style={{

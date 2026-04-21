@@ -111,10 +111,15 @@ export function Identify({ onAccept, onSkip, initialError }: IdentifyProps) {
   }
 
   return (
-    <div className="identify">
+    <div
+      className="identify"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="identify-title"
+    >
       <div className="identify-card">
         <div className="panel-head">
-          <span className="lead">auth // identify</span>
+          <span className="lead" id="identify-title">auth // identify</span>
           <span className="meta">channel::secure</span>
         </div>
         <div style={{ padding: '18px 22px' }}>
@@ -302,6 +307,30 @@ export function Identify({ onAccept, onSkip, initialError }: IdentifyProps) {
               </button>
             </div>
           )}
+
+          <div
+            style={{
+              marginTop: 22,
+              paddingTop: 10,
+              borderTop: '1px dashed var(--border-faint)',
+              display: 'flex',
+              gap: 18,
+              fontSize: 10,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--phosphor-faint)',
+            }}
+          >
+            <a href="/privacy" style={{ color: 'var(--phosphor-faint)' }}>
+              privacy
+            </a>
+            <a href="/terms" style={{ color: 'var(--phosphor-faint)' }}>
+              terms
+            </a>
+            <span style={{ marginLeft: 'auto' }}>
+              by proceeding you accept both.
+            </span>
+          </div>
         </div>
       </div>
     </div>

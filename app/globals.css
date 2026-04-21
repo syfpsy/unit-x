@@ -582,16 +582,37 @@ html, body {
 
 /* ============================================================
    Reduced motion — respect the OS preference.
-   Disables flicker, beam, glitch (via JS), curvature, and the
-   fidgety animations (breathing, blink, pulse, save-flash scale,
-   beam-after). Colors and layout are untouched.
+   Kills every animation we can reach from CSS. JS-driven FX
+   (particle burst, glitch overlay, mascot frame cycling) check
+   `usePrefersReducedMotion` and self-suppress. Colors and layout
+   are intentionally untouched — the CRT aesthetic stays visible;
+   only the movement stops.
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  .crt-flicker { animation: none !important; }
-  .crt-scanlines::after { animation: none !important; opacity: 0 !important; }
-  .crt-curve { transform: none !important; }
-  .mascot .breathing { animation: none !important; }
-  .caret::after { animation: none !important; }
-  .topbar .status-dot { animation: none !important; }
-  .save-flash { animation: none !important; opacity: 1 !important; }
+  .crt-flicker              { animation: none !important; }
+  .crt-scanlines::after     { animation: none !important; opacity: 0 !important; }
+  .crt-curve                { transform: none !important; }
+  .mascot .breathing        { animation: none !important; }
+  .caret::after             { animation: none !important; opacity: 1 !important; }
+  .topbar .status-dot       { animation: none !important; }
+  .save-flash               { animation: none !important; opacity: 1 !important; transform: translate(-50%, -50%) !important; }
+}
+
+/* ============================================================
+   Focus-visible — keyboard traversal deserves the violet halo
+   so you can always see where you are. Intentionally only
+   triggers on keyboard focus (not click), matching the
+   `:focus-visible` contract.
+   ============================================================ */
+.term-btn:focus-visible,
+.tweaks-btn:focus-visible,
+.swatch:focus-visible,
+.input-row input:focus-visible,
+.identify input:focus-visible,
+.tweak-row select:focus-visible,
+.tweak-row input:focus-visible,
+.panel-head button:focus-visible {
+  outline: 1px solid var(--violet);
+  outline-offset: 2px;
+  box-shadow: 0 0 8px var(--violet-glow);
 }

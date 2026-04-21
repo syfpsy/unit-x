@@ -476,7 +476,7 @@ export function App() {
             </div>
           )}
           <div className="region-hints">
-            <div className="hints">
+            <nav className="hints" aria-label="directives">
               <span>
                 <kbd>↵</kbd>send
               </span>
@@ -509,7 +509,7 @@ export function App() {
               <span style={{ marginLeft: 'auto', color: 'var(--violet)' }}>
                 ◆ {tweaks.unitName} · bound to {operator || 'session'}
               </span>
-            </div>
+            </nav>
           </div>
         </div>
 

@@ -86,7 +86,12 @@ export function Gallery({ onClose, onEquipped }: GalleryProps) {
    ╚══════════════════════════════════════════════════════════════╝`;
 
   return (
-    <div className="soul-doc">
+    <div
+      className="soul-doc"
+      role="dialog"
+      aria-modal="true"
+      aria-label="cosmetics gallery"
+    >
       <div className="panel-head">
         <span className="lead">/ gallery</span>
         <span className="meta">
