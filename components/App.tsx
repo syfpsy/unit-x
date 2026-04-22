@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import { Boot, type BootLine } from './Boot';
+import { Constellation } from './Constellation';
 import { GlitchOverlay, ParticleBurst } from './Fx';
 import { Gallery } from './Gallery';
 import { Identify } from './Identify';
@@ -108,6 +109,7 @@ export function App() {
   const [equipped, setEquipped] = useState<Record<string, { slug: string; name: string; payload: CosmeticPayload }>>({});
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [constellationOpen, setConstellationOpen] = useState(false);
   const [bootLines, setBootLines] = useState<ReadonlyArray<BootLine> | null>(null);
 
   // Boot runs before any network call, so the equipped banner for this
@@ -367,6 +369,7 @@ export function App() {
         setTweaksOpen(false);
         setGalleryOpen(false);
         setTimelineOpen(false);
+        setConstellationOpen(false);
       }
       if (e.key === '?' && e.shiftKey) setTweaksOpen((o) => !o);
     }
@@ -462,6 +465,7 @@ export function App() {
               openSoul={() => setSoulOpen(true)}
               openGallery={() => setGalleryOpen(true)}
               openTimeline={() => setTimelineOpen(true)}
+              openConstellation={() => setConstellationOpen(true)}
               doSave={doSave}
               doClear={doClear}
               doLogout={doLogout}
@@ -513,6 +517,9 @@ export function App() {
                 <kbd>/timeline</kbd>record
               </span>
               <span>
+                <kbd>/constellation</kbd>sky
+              </span>
+              <span>
                 <kbd>/export</kbd>download</span>
               <span>
                 <kbd>esc</kbd>close
@@ -547,6 +554,13 @@ export function App() {
         )}
 
         {timelineOpen && <Timeline onClose={() => setTimelineOpen(false)} />}
+
+        {constellationOpen && (
+          <Constellation
+            memories={memories}
+            onClose={() => setConstellationOpen(false)}
+          />
+        )}
 
         {galleryOpen && (
           <Gallery

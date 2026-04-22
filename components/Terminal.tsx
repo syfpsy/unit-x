@@ -18,6 +18,7 @@ const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
   { cmd: '/soul', desc: 'open the soul.md ledger' },
   { cmd: '/gallery', desc: 'open the cosmetic wardrobe' },
   { cmd: '/timeline', desc: 'see the record of what you have earned' },
+  { cmd: '/constellation', desc: 'plot the ledger as a sky of shared words' },
   { cmd: '/save', desc: 'commit current thread to /soul/' },
   { cmd: '/clear', desc: 'wipe visible scroll (memory persists)' },
   { cmd: '/who', desc: 'report identity + uptime' },
@@ -111,6 +112,7 @@ interface TerminalProps {
   openSoul: () => void;
   openGallery: () => void;
   openTimeline: () => void;
+  openConstellation: () => void;
   doSave: () => void;
   doClear: () => void;
   doLogout: () => void;
@@ -136,6 +138,7 @@ export function Terminal({
   openSoul,
   openGallery,
   openTimeline,
+  openConstellation,
   doSave,
   doClear,
   doLogout,
@@ -564,6 +567,10 @@ export function Terminal({
       }
       if (cmd === '/timeline') {
         openTimeline();
+        return;
+      }
+      if (cmd === '/constellation') {
+        openConstellation();
         return;
       }
       if (cmd === '/save') {
