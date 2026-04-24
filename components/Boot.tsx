@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { stars } from '@/lib/ascii/primitives';
+import { AsciiField } from './AsciiField';
 
 export type BootLine = { t: 'dim' | 'faint' | 'ok' | 'violet' | 'warn'; s: string };
 
@@ -73,8 +75,13 @@ export function Boot({ onComplete, speed = 1, lines }: BootProps) {
     return () => clearTimeout(t);
   }, [shown, subChar, speed, onComplete]);
 
+  // Full-width sparkle tail once the last line has rendered — pops
+  // for the ~600ms before `onComplete` fires. Gives the banner a
+  // "coming online" exhale that lines up with the identify handoff.
+  const finished = shown >= BOOT.length;
+
   return (
-    <div className="boot">
+    <div className="boot" style={{ position: 'relative' }}>
       {BOOT.slice(0, shown).map((l, i) => (
         <pre key={i} className={l.t}>
           {l.s || ' '}
@@ -85,6 +92,27 @@ export function Boot({ onComplete, speed = 1, lines }: BootProps) {
           {BOOT[shown].s.slice(0, subChar)}
           <span style={{ background: 'var(--phosphor)', color: '#000', padding: '0 3px' }}>_</span>
         </pre>
+      )}
+      {finished && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            color: 'var(--violet)',
+            opacity: 0.55,
+            mixBlendMode: 'screen',
+          }}
+          aria-hidden="true"
+        >
+          <AsciiField
+            cell={stars({ density: 0.05, glyphs: '·✦+*·', rate: 5 })}
+            width={68}
+            height={24}
+            fps={14}
+            style={{ fontSize: 'inherit', lineHeight: 'inherit' }}
+          />
+        </div>
       )}
     </div>
   );

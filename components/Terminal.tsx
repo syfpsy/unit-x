@@ -11,6 +11,8 @@ import {
 } from 'react';
 import { complete } from '@/lib/claudeClient';
 import { stagePromptAddendum, type EvolutionState } from '@/lib/evolution';
+import { scan } from '@/lib/ascii/primitives';
+import { AsciiField } from './AsciiField';
 import type { MascotState, Memory, Message, Who } from './types';
 
 const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
@@ -696,8 +698,28 @@ export function Terminal({
               <div className="who">
                 <b>{unitName.toUpperCase()}</b>
               </div>
-              <div className="body" style={{ color: 'var(--phosphor-faint)' }}>
-                &gt; parsing <span className="caret" />
+              <div
+                className="body"
+                style={{
+                  color: 'var(--phosphor-faint)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                <span>&gt; parsing</span>
+                <AsciiField
+                  cell={scan({ speed: 22, bandwidth: 3, ramp: ' ·:-=+*#' })}
+                  width={18}
+                  height={1}
+                  fps={20}
+                  style={{
+                    color: 'var(--violet)',
+                    opacity: 0.85,
+                    fontSize: 'inherit',
+                  }}
+                />
+                <span className="caret" />
               </div>
             </div>
           )}

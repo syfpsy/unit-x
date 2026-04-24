@@ -9,6 +9,7 @@ import {
 import { Boot, type BootLine } from './Boot';
 import { Constellation } from './Constellation';
 import { GlitchOverlay, ParticleBurst } from './Fx';
+import { StarBurst } from './StarBurst';
 import { Gallery } from './Gallery';
 import { Identify } from './Identify';
 import { IdleReverie } from './IdleReverie';
@@ -99,6 +100,7 @@ export function App() {
   const [burstKey, setBurstKey] = useState(0);
   const [burstVariant, setBurstVariant] = useState<'save' | 'glitch'>('save');
   const [glitchKey, setGlitchKey] = useState(0);
+  const [starBurstKey, setStarBurstKey] = useState(0);
   const [dreamTrigger] = useState(0);
   const sessionStart = useRef(Date.now()).current;
   const lastActivityRef = useRef<number>(Date.now());
@@ -256,6 +258,9 @@ export function App() {
           const { from, to } = body.stageUp;
           setTimeout(() => {
             triggerSaveFlash(`◆ stage reached · ${body.evolution?.title ?? 'stage ' + to}`);
+            // Full-viewport sparkle overlay for the stage-up beat —
+            // the character-grid companion to the canvas particles.
+            setStarBurstKey((k) => k + 1);
             setMessages((ms) => [
               ...ms,
               {
@@ -648,6 +653,8 @@ export function App() {
 
         <ParticleBurst trigger={burstKey} variant={burstVariant} />
         <GlitchOverlay trigger={glitchKey} />
+        <StarBurst trigger={starBurstKey} durationMs={2200} />
+
 
         <div className="crt-glow-layer" />
         <div className="crt-scanlines" />

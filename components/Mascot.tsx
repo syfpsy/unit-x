@@ -4,6 +4,8 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { usePrefersReducedMotion } from '@/lib/usePrefersReducedMotion';
 import { mergeSpecs, renderPortrait } from '@/lib/portrait/render';
 import { STAGE_SPECS } from '@/lib/portrait/stages';
+import { pulse, rain, stars } from '@/lib/ascii/primitives';
+import { AsciiField } from './AsciiField';
 import type { CosmeticPayload } from '@/lib/cosmetics/types';
 import type { EvolutionStage } from '@/lib/evolution';
 import type { MascotState } from './types';
@@ -119,16 +121,92 @@ export function Mascot({
       ? 'PROCESSING'
       : 'STANDBY';
 
+  // Procedural backdrop sized generously enough to cover the portrait
+  // at any stage (stage-4 is tallest, ~11 rows × ~24 cols). Lives in an
+  // absolutely-positioned layer beneath the mascot so characters from
+  // the mascot paint cleanly on top.
+  const BG_W = 30;
+  const BG_H = 12;
+  const isDreaming = state === 'dreaming';
+  const isRecovering = state === 'recovering';
+  const isIdle = state === 'idle';
+
   return (
     <div
       className="mascot"
       role="img"
       aria-label={`UNIT-X · ${status.toLowerCase()}`}
     >
-      <div className="breathing">
-        <pre style={{ margin: 0 }} aria-hidden="true">
-          {withEyes}
-        </pre>
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        {/* Dreaming: slow rain behind the mascot. */}
+        {isDreaming && (
+          <AsciiField
+            cell={rain({ density: 0.4, speed: 0.35, trail: 5 })}
+            width={BG_W}
+            height={BG_H}
+            fps={10}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              color: 'var(--phosphor-faint)',
+              opacity: 0.45,
+              pointerEvents: 'none',
+              zIndex: 0,
+              fontSize: 'inherit',
+            }}
+          />
+        )}
+        {/* Recovering: static-like sparkles burst across the portrait
+             for the 2.4s the state lasts. Higher strobe rate sells the
+             "signal dropping" read. */}
+        {isRecovering && (
+          <AsciiField
+            cell={stars({ density: 0.12, glyphs: '·.╱╲╳', rate: 6 })}
+            width={BG_W}
+            height={BG_H}
+            fps={12}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              color: 'var(--hostile)',
+              opacity: 0.6,
+              pointerEvents: 'none',
+              zIndex: 2,
+              fontSize: 'inherit',
+            }}
+          />
+        )}
+        {/* Idle: ambient violet pulse halo that breathes in sync with
+             the CSS `.breathing` scale animation. Subtle — aria-hidden
+             decorative glow. */}
+        {isIdle && !reduced && (
+          <AsciiField
+            cell={pulse({ period: 3.6, ramp: ' ·•', amplitude: 0.7 })}
+            width={BG_W}
+            height={BG_H}
+            fps={8}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              color: 'var(--violet)',
+              opacity: 0.18,
+              pointerEvents: 'none',
+              zIndex: 0,
+              fontSize: 'inherit',
+            }}
+          />
+        )}
+        <div className="breathing" style={{ position: 'relative', zIndex: 1 }}>
+          <pre style={{ margin: 0 }} aria-hidden="true">
+            {withEyes}
+          </pre>
+        </div>
       </div>
       <div
         style={{
