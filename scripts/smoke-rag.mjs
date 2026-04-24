@@ -69,50 +69,64 @@ try {
 
   // Five memories spanning distinct topics. Query should pull the
   // bike ones on a bike query and the sister ones on a sister query.
-  const texts = [
-    'sister mira moving back from berlin next month',
-    'anxious about the interview with kestrel labs',
-    'bike tire keeps losing pressure every two days',
-    'the blue mountain bike in the basement needs new brake pads',
-    'coffee with dad last sunday felt different this time',
-  ];
+  // Seed with labelled keys so we can assert *which* memories rank top
+  // rather than relying on arbitrary distance thresholds (which shift
+  // between models + phrase lengths).
+  const seeds = {
+    sister:   'sister mira moving back from berlin next month',
+    interview:'anxious about the interview with kestrel labs',
+    bike1:    'bike tire keeps losing pressure every two days',
+    bike2:    'the blue mountain bike in the basement needs new brake pads',
+    dad:      'coffee with dad last sunday felt different this time',
+  };
+  const keys = Object.keys(seeds);
+  const texts = Object.values(seeds);
   const vecs = await embed(texts);
+  const ids = {};
   for (let i = 0; i < texts.length; i++) {
     const { cipher, nonce } = encrypt(texts[i], operatorId);
-    await sql`
+    const [row] = await sql`
       insert into memories (operator_id, tag, text_cipher, nonce, embedding, embedding_model)
       values (${operatorId}, 'fact', ${cipher}, ${nonce}, ${vec(vecs[i])}::vector, ${`openai/${MODEL}@${DIM}`})
+      returning id
     `;
+    ids[keys[i]] = row.id;
   }
   console.log(`[smoke-rag] seeded ${texts.length} embedded memories`);
 
-  // Query 1: bike → expect the two bike memories at top.
-  const [q1vec] = await embed(['my bike has been giving me trouble']);
-  const bikeHits = await sql`
-    select id, (embedding <=> ${vec(q1vec)}::vector) as dist
-    from memories
-    where operator_id = ${operatorId} and deleted_at is null and embedding is not null
-    order by embedding <=> ${vec(q1vec)}::vector
-    limit 3
-  `;
-  console.log('[smoke-rag] bike query → top 3 distances:', bikeHits.map((r) => r.dist.toFixed(3)));
-  // top 2 should have distance < 0.5
-  if (bikeHits[0].dist > 0.5 || bikeHits[1].dist > 0.5) {
-    throw new Error(`bike ranking looks off — first two distances should be < 0.5`);
+  // Top-K by ID. Meaningful regardless of absolute distance magnitudes.
+  async function topK(queryText, k) {
+    const [q] = await embed([queryText]);
+    const rows = await sql`
+      select id, (embedding <=> ${vec(q)}::vector) as dist
+      from memories
+      where operator_id = ${operatorId} and deleted_at is null and embedding is not null
+      order by embedding <=> ${vec(q)}::vector
+      limit ${k}
+    `;
+    return rows;
   }
 
-  // Query 2: sister → expect the sister memory at top.
-  const [q2vec] = await embed(['tell me about my sister']);
-  const sisterHits = await sql`
-    select id, (embedding <=> ${vec(q2vec)}::vector) as dist
-    from memories
-    where operator_id = ${operatorId} and deleted_at is null and embedding is not null
-    order by embedding <=> ${vec(q2vec)}::vector
-    limit 1
-  `;
-  console.log('[smoke-rag] sister query → top distance:', sisterHits[0].dist.toFixed(3));
-  if (sisterHits[0].dist > 0.5) {
-    throw new Error('sister ranking looks off');
+  // Query 1: bike → top 2 must be bike1 + bike2 (order either way).
+  const bikeHits = await topK('my bike has been giving me trouble', 3);
+  const bikeTop2 = new Set(bikeHits.slice(0, 2).map((r) => r.id));
+  console.log('[smoke-rag] bike query → distances:', bikeHits.map((r) => r.dist.toFixed(3)));
+  if (!bikeTop2.has(ids.bike1) || !bikeTop2.has(ids.bike2)) {
+    throw new Error('bike query did not rank both bike memories in the top 2');
+  }
+
+  // Query 2: sister → top hit must be the sister memory.
+  const sisterHits = await topK('tell me about my sister', 1);
+  console.log('[smoke-rag] sister query → distance:', sisterHits[0].dist.toFixed(3));
+  if (sisterHits[0].id !== ids.sister) {
+    throw new Error('sister query did not rank the sister memory first');
+  }
+
+  // Query 3 (new): emotional weather → dad memory should win over bike.
+  const feelingHits = await topK('how was it seeing family last weekend', 1);
+  console.log('[smoke-rag] family query → distance:', feelingHits[0].dist.toFixed(3));
+  if (feelingHits[0].id !== ids.dad && feelingHits[0].id !== ids.sister) {
+    throw new Error('family query did not rank a family memory first');
   }
 
   console.log('[smoke-rag] ✓ similarity ranking verified');

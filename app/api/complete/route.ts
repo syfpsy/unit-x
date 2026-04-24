@@ -122,7 +122,11 @@ export async function POST(req: NextRequest) {
             operatorId: authedOperator.id,
             queryEmbedding: queryVec,
             limit: 8,
-            maxDistance: 0.55,
+            // text-embedding-3-small cosine distances for semantically
+            // related short phrases land in the 0.5–0.75 range; truly
+            // unrelated pairs sit >0.85. 0.80 keeps on-topic recall
+            // without dragging in noise.
+            maxDistance: 0.8,
           });
           if (hits.length > 0) {
             const recall = hits

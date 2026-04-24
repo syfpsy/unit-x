@@ -32,7 +32,10 @@ export async function similarMemories(params: {
 }): Promise<RecallHit[]> {
   const db = getDb();
   const limit = params.limit ?? 8;
-  const maxDistance = params.maxDistance ?? 0.5;
+  // Default calibrated for text-embedding-3-small on short phrases;
+  // override via the `maxDistance` arg if a different embedding model
+  // produces tighter / looser distance distributions.
+  const maxDistance = params.maxDistance ?? 0.8;
   const vec = vectorLiteral(params.queryEmbedding);
 
   // We use `db.execute` + raw SQL because pgvector operators aren't
