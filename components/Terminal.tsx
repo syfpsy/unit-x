@@ -17,6 +17,7 @@ const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
   { cmd: '/help', desc: 'show this list' },
   { cmd: '/soul', desc: 'open the soul.md ledger' },
   { cmd: '/gallery', desc: 'open the cosmetic wardrobe' },
+  { cmd: '/settings', desc: 'aesthetic, layout, and pace' },
   { cmd: '/timeline', desc: 'see the record of what you have earned' },
   { cmd: '/constellation', desc: 'plot the ledger as a sky of shared words' },
   { cmd: '/save', desc: 'commit current thread to /soul/' },
@@ -111,6 +112,7 @@ interface TerminalProps {
   bumpSpeak: () => void;
   openSoul: () => void;
   openGallery: () => void;
+  openSettings: () => void;
   openTimeline: () => void;
   openConstellation: () => void;
   doSave: () => void;
@@ -137,6 +139,7 @@ export function Terminal({
   bumpSpeak,
   openSoul,
   openGallery,
+  openSettings,
   openTimeline,
   openConstellation,
   doSave,
@@ -563,6 +566,10 @@ export function Terminal({
       }
       if (cmd === '/gallery') {
         openGallery();
+        return;
+      }
+      if (cmd === '/settings') {
+        openSettings();
         return;
       }
       if (cmd === '/timeline') {

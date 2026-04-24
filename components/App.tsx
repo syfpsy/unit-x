@@ -12,11 +12,12 @@ import { GlitchOverlay, ParticleBurst } from './Fx';
 import { Gallery } from './Gallery';
 import { Identify } from './Identify';
 import { IdleReverie } from './IdleReverie';
+import { Mascot } from './Mascot';
 import { SidePanel } from './SidePanel';
 import { SoulDoc } from './SoulDoc';
 import { Terminal } from './Terminal';
 import { Timeline } from './Timeline';
-import { PHOSPHORS, Tweaks } from './Tweaks';
+import { PHOSPHORS, Settings } from './Settings';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { computeEvolution, type EvolutionStage, type EvolutionState } from '@/lib/evolution';
 import type { CosmeticPayload, GalleryEntry } from '@/lib/cosmetics/types';
@@ -37,11 +38,14 @@ const CRT_PRESETS: Record<Exclude<CRTMode, 'custom'>, CRTToggles> = {
   full:   { flicker: true,  scanlines: true,  beam: true,  glow: true,  curve: true  },
 };
 
+// First-run defaults: all CRT layers OFF. Newcomers see the cleanest
+// possible terminal; anyone who wants the full phosphor-bloom experience
+// flips it on in /settings. (Persists via localStorage after first toggle.)
 const TWEAK_DEFAULTS: TweakState = {
   phosphor: 'green',
-  crt: 'full',
-  crtToggles: CRT_PRESETS.full,
-  scanlines: true,
+  crt: 'off',
+  crtToggles: CRT_PRESETS.off,
+  scanlines: false,
   typeSpeed: 30,
   unitName: 'unit-x',
   layout: 'side-right',
@@ -101,7 +105,7 @@ export function App() {
   const [clockLabel, setClockLabel] = useState<string>('');
 
   const [tweaks, setTweaks] = useState<TweakState>(TWEAK_DEFAULTS);
-  const [tweaksOpen, setTweaksOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [operatorCreatedAt, setOperatorCreatedAt] = useState<Date | null>(null);
@@ -366,12 +370,12 @@ export function App() {
       lastActivityRef.current = Date.now();
       if (e.key === 'Escape') {
         setSoulOpen(false);
-        setTweaksOpen(false);
+        setSettingsOpen(false);
         setGalleryOpen(false);
         setTimelineOpen(false);
         setConstellationOpen(false);
       }
-      if (e.key === '?' && e.shiftKey) setTweaksOpen((o) => !o);
+      if (e.key === '?' && e.shiftKey) setSettingsOpen((o) => !o);
     }
     function onMouse() {
       lastActivityRef.current = Date.now();
@@ -437,35 +441,37 @@ export function App() {
             </span>
             <span>ch.07</span>
             <span suppressHydrationWarning>{clockLabel}</span>
-            {/* Mobile-only: tiny mascot-state + stage indicator that
-                takes the place of the side-panel portrait which is
-                hidden below 768px. Desktop CSS keeps this display:none. */}
+            {/* Mobile stage indicator — the mascot itself is rendered in
+                a strip inside the main region, so we only need the stage
+                label here. Hidden at desktop widths via `.mobile-status`. */}
             <span className="mobile-status" aria-hidden="true">
-              ◆ {evolution?.title ?? 'live'} ·{' '}
-              {mascotState === 'idle'
-                ? 'standby'
-                : mascotState === 'thinking'
-                ? 'processing'
-                : mascotState === 'speaking'
-                ? 'transmitting'
-                : mascotState === 'dreaming'
-                ? 'dreaming'
-                : 'recovering'}
+              ◆ {evolution?.title ?? 'live'}
             </span>
             <button
               type="button"
-              className={`tweaks-btn ${tweaksOpen ? 'open' : ''}`}
-              onClick={() => setTweaksOpen((o) => !o)}
-              title="tweaks — shift+?"
-              aria-label="tweaks"
+              className={`tweaks-btn ${settingsOpen ? 'open' : ''}`}
+              onClick={() => setSettingsOpen((o) => !o)}
+              title="settings — shift+?"
+              aria-label="settings"
             >
-              ◆ tweaks
+              ◆ settings
             </button>
           </div>
         </div>
 
         <div className="app" data-layout={layoutAttr} style={{ marginTop: 10 }}>
           <div className="region-main">
+            {/* Mobile-only companion strip. Keeps the mascot visible on
+                phones where the side panel is hidden. Reuses the same
+                Mascot component — scaled down via CSS. */}
+            <div className="mobile-mascot-strip">
+              <Mascot
+                state={mascotState}
+                speakingTick={speakingTick}
+                stage={evolution?.stage ?? 1}
+                cosmeticPayload={equipped.mascot?.payload ?? null}
+              />
+            </div>
             <Terminal
               operator={operator}
               unitName={tweaks.unitName}
@@ -479,6 +485,7 @@ export function App() {
               bumpSpeak={bumpSpeak}
               openSoul={() => setSoulOpen(true)}
               openGallery={() => setGalleryOpen(true)}
+              openSettings={() => setSettingsOpen(true)}
               openTimeline={() => setTimelineOpen(true)}
               openConstellation={() => setConstellationOpen(true)}
               doSave={doSave}
@@ -540,7 +547,7 @@ export function App() {
                 <kbd>esc</kbd>close
               </span>
               <span>
-                <kbd>shift+?</kbd>tweaks
+                <kbd>shift+?</kbd>settings
               </span>
               <span style={{ marginLeft: 'auto', color: 'var(--violet)' }}>
                 ◆ {tweaks.unitName} · bound to {operator || 'session'}
@@ -631,7 +638,13 @@ export function App() {
 
         {flashText && <div className="save-flash">{flashText}</div>}
 
-        <Tweaks open={tweaksOpen} state={tweaks} setState={setTweaks} />
+        {settingsOpen && (
+          <Settings
+            state={tweaks}
+            setState={setTweaks}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
 
         <ParticleBurst trigger={burstKey} variant={burstVariant} />
         <GlitchOverlay trigger={glitchKey} />
