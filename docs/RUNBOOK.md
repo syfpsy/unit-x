@@ -3,21 +3,40 @@
 Operational procedures. One ritual per section. The README is for
 newcomers; this file is for the person on-call.
 
-## Rotate the DeepSeek API key
+## Chat LLM (OpenRouter / any OpenAI-compatible provider)
 
-1. Revoke the old key at <https://platform.deepseek.com/>.
+The chat pipe reads `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` — any
+provider with an OpenAI-compatible `/v1/chat/completions` endpoint
+works. Legacy `DEEPSEEK_*` names still work as a fallback while an
+existing deployment is rolled over.
+
+Current production: **OpenRouter** at
+`https://openrouter.ai/api`, model `deepseek/deepseek-chat`. Switching
+model = one env change:
+
+```
+vercel env rm LLM_MODEL production --yes
+printf '%s' 'anthropic/claude-haiku-4.7' | vercel env add LLM_MODEL production
+vercel deploy --prod --yes --force
+```
+
+Other useful slugs: `deepseek/deepseek-chat`, `google/gemini-flash-1.5`,
+`anthropic/claude-haiku-4.7`, `meta-llama/llama-3.3-70b-instruct:free`.
+Changing models can shift `<remember>` tag adherence — watch the next
+few turns and tighten the system prompt in `Terminal.tsx#buildSystemPrompt`
+if the new model drops tags.
+
+### Rotate the LLM API key
+
+1. Revoke the old key at the provider (OpenRouter → Settings → Keys).
 2. Add the new key to every environment:
    ```
    for env in production preview development; do
-     vercel env rm DEEPSEEK_API_KEY $env --yes
-     printf '%s' '<new key>' | vercel env add DEEPSEEK_API_KEY $env
+     vercel env rm LLM_API_KEY $env --yes
+     printf '%s' '<new key>' | vercel env add LLM_API_KEY $env
    done
    ```
-3. Force-redeploy so the running function picks up the new env:
-   ```
-   vercel deploy --prod --yes --force
-   ```
-4. Pull locally: `vercel env pull .env.local`.
+3. `vercel deploy --prod --yes --force` and `vercel env pull .env.local`.
 
 ## Rotate the master encryption key (UNITX_MASTER_KEY)
 

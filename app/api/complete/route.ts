@@ -42,12 +42,21 @@ function couldBeRememberPrefix(tail: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  const baseUrl = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+  // Provider-agnostic chat config. The LLM_* names are primary; the old
+  // DEEPSEEK_* names still work as a fallback so existing deployments
+  // don't break on the rename. Default points at OpenRouter so a single
+  // key unlocks DeepSeek, Anthropic, Google, Mistral, Llama, and local
+  // models — `LLM_MODEL` is just a slug swap away.
+  const apiKey = process.env.LLM_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const baseUrl =
+    process.env.LLM_BASE_URL ||
+    process.env.DEEPSEEK_BASE_URL ||
+    'https://openrouter.ai/api';
+  const model =
+    process.env.LLM_MODEL || process.env.DEEPSEEK_MODEL || 'deepseek/deepseek-chat';
 
   if (!apiKey) {
-    return sseError('missing DEEPSEEK_API_KEY in server env', 500);
+    return sseError('missing LLM_API_KEY in server env', 500);
   }
 
   let body: CompleteBody;
@@ -133,6 +142,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // OpenRouter-specific headers. Both are optional but recommended for
+  // leaderboard attribution; harmless against a direct DeepSeek endpoint
+  // since unknown headers are ignored. Site URL defaults to the
+  // production deploy when set in env.
+  const attributionHeaders: Record<string, string> = {};
+  if (baseUrl.includes('openrouter.ai')) {
+    attributionHeaders['HTTP-Referer'] =
+      process.env.LLM_SITE_URL || 'https://unit-x-eta.vercel.app';
+    attributionHeaders['X-Title'] = process.env.LLM_APP_NAME || 'UNIT-X';
+  }
+
   let upstream: Response;
   try {
     upstream = await fetch(`${baseUrl}/v1/chat/completions`, {
@@ -141,6 +161,7 @@ export async function POST(req: NextRequest) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        ...attributionHeaders,
       },
       body: JSON.stringify({
         model,

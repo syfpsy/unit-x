@@ -29,13 +29,20 @@ export async function GET() {
     status = 503;
   }
 
-  // DeepSeek env
-  if (process.env.DEEPSEEK_API_KEY) {
-    checks.deepseek_env = 'ok';
+  // LLM provider (primary name LLM_API_KEY; legacy DEEPSEEK_API_KEY
+  // still accepted for in-place rollouts).
+  if (process.env.LLM_API_KEY || process.env.DEEPSEEK_API_KEY) {
+    checks.llm_env = 'ok';
   } else {
-    checks.deepseek_env = 'missing DEEPSEEK_API_KEY';
+    checks.llm_env = 'missing LLM_API_KEY';
     status = 503;
   }
+
+  // Embeddings provider — optional. RAG degrades to recency when
+  // absent, so this is informational only.
+  checks.embeddings = process.env.OPENAI_API_KEY
+    ? 'ok'
+    : 'disabled (no OPENAI_API_KEY; RAG falls back to recency)';
 
   // Master key
   const key = process.env.UNITX_MASTER_KEY;
