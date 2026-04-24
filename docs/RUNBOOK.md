@@ -126,6 +126,37 @@ The `embeddingModel` column records which model produced each row's
 vector, so you can detect drift and re-embed in place if desired
 without a full wipe.
 
+## Rotate the Google OAuth client secret
+
+Google Cloud has stopped showing plaintext secrets after creation, so
+the only way to rotate is **create a new secret, swap, delete the old**.
+Client ID is public and lives in `supabase/config.toml` — don't touch
+that. We rotate the `GOOGLE_CLIENT_SECRET` env alone.
+
+1. Google Cloud → APIs & Services → Credentials → click **UnitX** →
+   scroll to **Client secrets** → **+ Add secret**. The modal shows the
+   new secret once — download the JSON immediately (the "Download JSON"
+   button inside the modal). It lands in `~/Downloads/client_secret_N_…json`.
+2. Open the JSON, grab the `client_secret` value (starts with `GOCSPX-`).
+3. Swap everywhere:
+   ```
+   for env in production preview development; do
+     vercel env rm GOOGLE_CLIENT_SECRET $env --yes
+     printf '%s' '<new GOCSPX-…>' | vercel env add GOOGLE_CLIENT_SECRET $env
+   done
+   vercel env pull .env.local
+   # Push the new secret into Supabase (config.toml stays identical):
+   set -a && source .env.local && set +a
+   echo Y | supabase config push --project-ref opflfqtuqcjpmjyyqfrz
+   ```
+4. Verify `/auth/v1/settings` still returns `"google": true`, then try a
+   real sign-in on unit-x-eta.vercel.app.
+5. Back in Google Cloud → UnitX, **Disable** the old secret row, wait a
+   minute, then click the trash icon. Leave exactly one live secret.
+6. `vercel deploy --prod --yes` — new secret is in Supabase already, so
+   this is only needed if the Next.js app ever reads the env directly
+   (today it doesn't).
+
 ## Inspect the retention sweep
 
 The daily cron lives at `/api/cron/retention` and runs at 04:17 UTC
