@@ -550,6 +550,30 @@ novel later:
   Live at https://unit-x-eta.vercel.app. Magic link works out of the
   box; Google OAuth requires one-time configuration in the Supabase
   dashboard + Google Cloud (see next-steps note in agent memory).
+- **2026-04-24** — Phase 12 shipped. Semantic memory (RAG).
+  pgvector extension enabled on Supabase; `memories.embedding vector
+  (1536)` + `memories.embedding_model varchar(64)` columns added with
+  a partial HNSW cosine index (`WHERE embedding IS NOT NULL`).
+  `lib/llm/embed.ts` is a swappable provider layer — OpenAI's
+  `text-embedding-3-small@1536` by default, `EMBEDDING_PROVIDER=none`
+  disables entirely, everything configurable via env.
+  Write path: `insertMemory` embeds the plaintext before the row
+  lands. Embedding failure never blocks the insert — the row ships
+  with `embedding = NULL` and is caught by the next backfill.
+  Read path: `/api/complete` embeds the last user turn, calls
+  `similarMemories(operatorId, queryVec, limit=8, maxDistance=0.55)`,
+  and injects a `RECALL:` block into the system prompt alongside the
+  recency-ordered soul block the Mind already builds. Client didn't
+  need to change.
+  `scripts/backfill-embeddings.mjs` catches pre-phase-12 memories;
+  `scripts/smoke-rag.mjs` verifies semantic ranking end-to-end with
+  a disposable operator + bike/sister queries hitting the right
+  memories. RUNBOOK entry covers first-time enable, key rotation,
+  and model/dimension migration paths. ARCHITECTURE note updated —
+  the "Memory categories" section gains a shipped-Phase-12 subsection
+  on semantic recall with an explicit trust-boundary note (embedding
+  vectors leak semantic shape of memories on a DB dump, though not
+  the plaintext).
 - **2026-04-22** — Phase 11 shipped. Continuity made visible.
   Three sub-phases in one push:
   - **11.1 Mode expansion** — `MascotState` gains `dreaming` and

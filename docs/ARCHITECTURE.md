@@ -137,6 +137,35 @@ the curated layer. An operator-curated third layer (a `/keep` command
 that promotes a transcript line into the ledger) is still on the
 table; no concrete plan yet.
 
+### Semantic recall (Phase 12 — shipped)
+
+- `memories.embedding vector(1536)` + `memories.embedding_model
+  varchar(64)` + HNSW cosine index (partial on
+  `WHERE embedding IS NOT NULL`). pgvector extension enabled in the
+  Supabase DB via migration 0007.
+- `lib/llm/embed.ts` — provider interface, OpenAI (text-embedding-
+  3-small @ 1536d) as default. `EMBEDDING_PROVIDER=none` disables
+  entirely.
+- Write path: `insertMemory` embeds the plaintext before insert and
+  stores the vector on the row. Embedding failure never blocks the
+  insert — the row ships with `embedding = NULL` and gets picked up
+  by the next backfill.
+- Read path: `/api/complete` embeds the last user turn, calls
+  `similarMemories(operatorId, queryVec, limit=8, maxDistance=0.55)`,
+  and injects the hits as a `RECALL:` block appended to the system
+  prompt (alongside the recency-ordered soul block the Mind already
+  builds). Degrades cleanly when the provider is unavailable.
+- Encryption + embedding interplay: embeddings are derived from
+  decrypted plaintext but stored plaintext-ish (as float arrays). A
+  DB dump leaks semantic *shape* of the operator's memories, not the
+  text. Acceptable trade-off; full encryption would preclude ANN
+  search. Documented as a known trust-boundary.
+- `scripts/backfill-embeddings.mjs` catches up rows that predate
+  pgvector (or whose write-time embedding failed). Idempotent.
+- `scripts/smoke-rag.mjs` end-to-end test with a disposable operator,
+  seeded memories, and two distinct query terms that should rank
+  different memories at the top.
+
 ## Modes (Phase 11 — dreaming + recovering shipped; focused pending)
 
 Current mascot states and what fires them:

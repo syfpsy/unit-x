@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { getOperator } from '@/lib/auth/getOperator';
 import { insertMemory, insertMessage } from '@/lib/db/ledger';
+import { similarMemories } from '@/lib/db/memories-rag';
+import { getEmbeddingProvider } from '@/lib/llm/embed';
 import { anonKey, checkRateLimit } from '@/lib/ratelimit';
 import { log } from '@/lib/logger';
 import type { MemoryTag } from '@/components/types';
@@ -94,6 +96,43 @@ export async function POST(req: NextRequest) {
   const abort = new AbortController();
   req.signal.addEventListener('abort', () => abort.abort());
 
+  // Phase 12 — semantic recall. Embed the last user turn and pull the
+  // top-K most-similar memories for this operator. Inject them into
+  // the system prompt as a RECALL: section alongside the client-side
+  // recency-ordered soul block the Mind already builds. Graceful
+  // degradation: no embedding provider → no RECALL block, no penalty.
+  let augmentedSystem = body.system;
+  if (authedOperator) {
+    const lastUserTurn = [...body.messages].reverse().find((m) => m.role === 'user');
+    const provider = getEmbeddingProvider();
+    if (provider && lastUserTurn?.content) {
+      try {
+        const [queryVec] = await provider.embed([lastUserTurn.content.slice(0, 2000)]);
+        if (queryVec && queryVec.length === provider.dimensions) {
+          const hits = await similarMemories({
+            operatorId: authedOperator.id,
+            queryEmbedding: queryVec,
+            limit: 8,
+            maxDistance: 0.55,
+          });
+          if (hits.length > 0) {
+            const recall = hits
+              .map((h) => `- [${h.tag}] ${h.text}`)
+              .join('\n');
+            augmentedSystem =
+              body.system +
+              `\n\nRECALL — memories semantically related to the current turn, ` +
+              `retrieved by cosine similarity. Use only if genuinely relevant; ` +
+              `do not force-fit.\n${recall}`;
+          }
+        }
+      } catch (err) {
+        log.warn('complete rag embedding failed', { err });
+        // fall through with the original system prompt
+      }
+    }
+  }
+
   let upstream: Response;
   try {
     upstream = await fetch(`${baseUrl}/v1/chat/completions`, {
@@ -108,7 +147,7 @@ export async function POST(req: NextRequest) {
         stream: true,
         temperature: body.temperature ?? 0.7,
         messages: [
-          { role: 'system', content: body.system },
+          { role: 'system', content: augmentedSystem },
           ...body.messages,
         ],
       }),

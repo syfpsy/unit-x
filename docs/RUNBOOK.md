@@ -69,6 +69,44 @@ the re-encrypt pass.
 3. `vercel deploy --prod --yes --force`.
 4. `vercel env pull .env.local`.
 
+## Embedding provider / RAG
+
+Semantic recall is on when `OPENAI_API_KEY` is set in the runtime env.
+With no key, writes skip the embedding (row has `embedding = NULL`)
+and `/api/complete` falls back to recency-only memory injection.
+
+### Turning RAG on for the first time
+
+```
+vercel env add OPENAI_API_KEY production        # paste an OpenAI key
+# (repeat for preview + development)
+vercel deploy --prod --yes --force
+vercel env pull .env.local
+npm run embeddings:backfill                     # catches up old memories
+```
+
+### Rotating the OpenAI key
+
+Same dance as any other secret — see the "Rotate the DeepSeek API key"
+section above, substituting `OPENAI_API_KEY`.
+
+### Switching embedding model or dimensions
+
+The DB column is `vector(1536)`. Changing to a different dimension
+means:
+
+1. New migration: `ALTER TABLE memories ALTER COLUMN embedding
+   TYPE vector(N);` — destructive, wipes existing vectors.
+2. Update `EMBEDDING_MODEL` / `EMBEDDING_DIMENSIONS` env.
+3. Rebuild the index: `DROP INDEX memories_embedding_cosine_idx;
+   CREATE INDEX … USING hnsw (embedding vector_cosine_ops) WHERE
+   embedding IS NOT NULL;`
+4. Re-run `npm run embeddings:backfill`.
+
+The `embeddingModel` column records which model produced each row's
+vector, so you can detect drift and re-embed in place if desired
+without a full wipe.
+
 ## Inspect the retention sweep
 
 The daily cron lives at `/api/cron/retention` and runs at 04:17 UTC

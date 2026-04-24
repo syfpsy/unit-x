@@ -12,6 +12,28 @@ const bytea = customType<{ data: Buffer; notNull: true; default: false }>({
 });
 
 /**
+ * pgvector bridge. Stored in Postgres as `vector(N)`; surfaced as
+ * `number[]` at the Drizzle layer. postgres.js serialises arrays as
+ * the `[0.1,0.2,…]` literal pgvector expects.
+ */
+const vector = (name: string, dims: number) =>
+  customType<{ data: number[]; driverData: string }>({
+    dataType() {
+      return `vector(${dims})`;
+    },
+    toDriver(value: number[]) {
+      return `[${value.join(',')}]`;
+    },
+    fromDriver(value: string) {
+      // pgvector returns `[0.1,0.2,…]`; strip brackets + split.
+      if (!value) return [];
+      const inner = value.replace(/^\[/, '').replace(/\]$/, '');
+      if (!inner) return [];
+      return inner.split(',').map(Number);
+    },
+  })(name);
+
+/**
  * Phase 3 schema: no auth yet — a single "dev" operator row is created on
  * first use and shared across all visitors. Phase 4 will add per-operator
  * scoping when magic-link auth lands.
@@ -56,6 +78,13 @@ export const memories = pgTable(
     // Encrypted content (ciphertext ‖ auth tag). See lib/crypto/cipher.ts.
     textCipher: bytea('text_cipher').notNull(),
     nonce: bytea('nonce').notNull(),
+    // Phase 12 — embedding vector for semantic recall. Nullable: rows
+    // inserted before the backfill completes, or when the embedding
+    // provider is unavailable at write time, fall back to the recency
+    // path. `embedding_model` records which model produced the vector
+    // so a future model migration can re-embed in place.
+    embedding: vector('embedding', 1536),
+    embeddingModel: varchar('embedding_model', { length: 64 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Soft-delete tombstone. /forget flips this; active ledger queries filter it out.
     // Phase 8 retention sweep overwrites text_cipher with zeros after a grace period.

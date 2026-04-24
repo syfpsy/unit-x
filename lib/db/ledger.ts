@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { decryptText, encryptText } from '@/lib/crypto/cipher';
+import { getEmbeddingProvider } from '@/lib/llm/embed';
 import { getDb } from './client';
 import { memories, messages } from './schema';
 import type { MemoryTag, Who } from '@/components/types';
@@ -62,6 +63,27 @@ export async function insertMemory(params: {
   const db = getDb();
   const clipped = params.text.slice(0, 200);
   const { cipher, nonce } = encryptText(clipped, params.operatorId);
+
+  // Try to embed before insert so the row ships with a vector. If the
+  // embedding provider is unavailable or the call fails, store the row
+  // without an embedding — a future backfill (scripts/backfill-
+  // embeddings.mjs) or the next time this text is rewritten will fill
+  // it in. Semantic recall silently skips NULL-embedding rows.
+  const provider = getEmbeddingProvider();
+  let embedding: number[] | null = null;
+  let modelSlug: string | null = null;
+  if (provider) {
+    try {
+      const [vec] = await provider.embed([clipped]);
+      if (vec && vec.length === provider.dimensions) {
+        embedding = vec;
+        modelSlug = provider.modelSlug;
+      }
+    } catch {
+      // swallow — write path must not block on the embedding provider
+    }
+  }
+
   const [row] = await db
     .insert(memories)
     .values({
@@ -69,6 +91,8 @@ export async function insertMemory(params: {
       tag: params.tag,
       textCipher: cipher,
       nonce,
+      embedding: embedding ?? undefined,
+      embeddingModel: modelSlug ?? undefined,
     })
     .returning({
       id: memories.id,

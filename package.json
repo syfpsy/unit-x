@@ -12,7 +12,9 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "keys:rotate": "node scripts/rotate-keys.mjs",
-    "retention:sweep": "node scripts/retention-sweep.mjs"
+    "retention:sweep": "node scripts/retention-sweep.mjs",
+    "embeddings:backfill": "node scripts/backfill-embeddings.mjs",
+    "smoke:rag": "node scripts/smoke-rag.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
