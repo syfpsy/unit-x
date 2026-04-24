@@ -126,6 +126,9 @@ interface TerminalProps {
   dreamTrigger: number;
   clearDreamTrigger: () => void;
   evolution: EvolutionState | null;
+  /** Pushed from App when a hint chip is tapped. `stamp` changes =
+   *  "apply this value again"; same stamp = "ignore, already applied". */
+  prefillInput?: { text: string; stamp: number } | null;
 }
 
 export function Terminal({
@@ -153,12 +156,35 @@ export function Terminal({
   dreamTrigger,
   clearDreamTrigger,
   evolution,
+  prefillInput,
 }: TerminalProps) {
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState<TypingState | null>(null);
   const [forgetPending, setForgetPending] = useState<ForgetPending | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  /** Index into the current tab-completion candidate list. Reset
+   *  whenever the user types a key that isn't Tab. */
+  const tabIdxRef = useRef(0);
+  const lastPrefillStamp = useRef(0);
+
+  // Hint-chip prefill handoff from App.tsx — stamp changes drive the
+  // effect so re-clicking the same chip re-prefills (helpful when the
+  // user edited and now wants a clean slate).
+  useEffect(() => {
+    if (!prefillInput) return;
+    if (prefillInput.stamp === lastPrefillStamp.current) return;
+    lastPrefillStamp.current = prefillInput.stamp;
+    setInput(prefillInput.text);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      // Caret at end so typing continues from where the prefill stopped.
+      const n = prefillInput.text.length;
+      el.setSelectionRange(n, n);
+    });
+  }, [prefillInput]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -761,6 +787,37 @@ ${forgetPending.matches.map((m) => `    - [${m.tag}] ${m.text}`).join('\n')}
             lastActivityRef.current = Date.now();
             if (e.key === 'Escape' && forgetPending) {
               cancelForget();
+            }
+            // Tab-completion for slash commands. Works on the first
+            // token only — args after the first space are preserved
+            // unchanged. Cycles through matches on repeated Tab presses.
+            if (e.key === 'Tab' && input.startsWith('/')) {
+              e.preventDefault();
+              const spaceAt = input.indexOf(' ');
+              const prefix = spaceAt === -1 ? input : input.slice(0, spaceAt);
+              const rest = spaceAt === -1 ? '' : input.slice(spaceAt);
+              const matches = HELP_TEXT.filter((h) => h.cmd.startsWith(prefix));
+              if (matches.length === 0) return;
+              const pick = matches[tabIdxRef.current % matches.length];
+              tabIdxRef.current += 1;
+              // If there's only one match and the input already equals
+              // it, append a space so the caret's ready for args.
+              const nextText =
+                matches.length === 1 && prefix === pick.cmd && !rest
+                  ? pick.cmd + ' '
+                  : pick.cmd + rest;
+              setInput(nextText);
+              // Place caret at end.
+              requestAnimationFrame(() => {
+                const el = inputRef.current;
+                if (!el) return;
+                el.focus();
+                el.setSelectionRange(nextText.length, nextText.length);
+              });
+            } else if (e.key !== 'Shift' && e.key !== 'Meta' && e.key !== 'Control' && e.key !== 'Alt') {
+              // Any real keystroke resets the completion cycle so the
+              // next Tab starts from match #0 against the new prefix.
+              tabIdxRef.current = 0;
             }
           }}
           placeholder={

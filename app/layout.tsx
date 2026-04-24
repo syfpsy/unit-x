@@ -57,6 +57,17 @@ export const viewport: Viewport = {
   // appears. Also shows nicely on desktop (no-op).
   interactiveWidget: 'resizes-content',
   viewportFit: 'cover',
+  // Lock the app to 1× scale — no pinch zoom, no double-tap zoom, no
+  // accidental scaling when focusing an input. Trade-off: disables the
+  // browser's own zoom gesture. We accept this because the terminal is
+  // already monospace + designed to fit the viewport; zoom breaks the
+  // grid rather than helping. The size toggles in /settings cover
+  // accessibility needs within the app's own system.
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

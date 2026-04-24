@@ -102,6 +102,13 @@ export function App() {
   const [glitchKey, setGlitchKey] = useState(0);
   const [starBurstKey, setStarBurstKey] = useState(0);
   const [dreamTrigger] = useState(0);
+  /** Prefill target for the chat input. Stamp changes trigger Terminal
+   *  to set its input value + focus; value stays around for inspection
+   *  but isn't re-applied until a new stamp arrives. */
+  const [prefillInput, setPrefillInput] = useState<{
+    text: string;
+    stamp: number;
+  } | null>(null);
   const sessionStart = useRef(Date.now()).current;
   const lastActivityRef = useRef<number>(Date.now());
   const [clockLabel, setClockLabel] = useState<string>('');
@@ -546,6 +553,7 @@ export function App() {
               dreamTrigger={dreamTrigger}
               clearDreamTrigger={() => {}}
               evolution={evolution}
+              prefillInput={prefillInput}
             />
           </div>
           {layoutAttr !== 'solo' && (
@@ -566,32 +574,39 @@ export function App() {
               <span>
                 <kbd>↵</kbd>send
               </span>
-              <span>
-                <kbd>/help</kbd>directives
-              </span>
-              <span>
-                <kbd>/soul</kbd>ledger
-              </span>
-              <span>
-                <kbd>/dream</kbd>reverie
-              </span>
-              <span>
-                <kbd>/essence</kbd>portrait
-              </span>
-              <span>
-                <kbd>/forget</kbd>excise
-              </span>
-              <span>
-                <kbd>/gallery</kbd>cosmetics
-              </span>
-              <span>
-                <kbd>/timeline</kbd>record
-              </span>
-              <span>
-                <kbd>/constellation</kbd>sky
-              </span>
-              <span>
-                <kbd>/export</kbd>download</span>
+              {(
+                [
+                  { cmd: '/help',          label: 'directives' },
+                  { cmd: '/soul',          label: 'ledger' },
+                  { cmd: '/dream',         label: 'reverie' },
+                  { cmd: '/essence',       label: 'portrait' },
+                  { cmd: '/forget',        label: 'excise', needsArg: true },
+                  { cmd: '/gallery',       label: 'cosmetics' },
+                  { cmd: '/timeline',      label: 'record' },
+                  { cmd: '/constellation', label: 'sky' },
+                  { cmd: '/export',        label: 'download' },
+                ] satisfies ReadonlyArray<{ cmd: string; label: string; needsArg?: boolean }>
+              ).map((h) => (
+                <button
+                  key={h.cmd}
+                  type="button"
+                  className="hint-btn"
+                  onClick={() => {
+                    // Prefill so destructive commands (e.g. /forget,
+                    // /delete-account) still need an explicit ENTER.
+                    // Commands that take an arg get a trailing space so
+                    // the caret lands ready for typing.
+                    setPrefillInput({
+                      text: h.cmd + (h.needsArg ? ' ' : ''),
+                      stamp: Date.now(),
+                    });
+                  }}
+                  title={`prefill ${h.cmd}`}
+                >
+                  <kbd>{h.cmd}</kbd>
+                  {h.label}
+                </button>
+              ))}
               <span>
                 <kbd>esc</kbd>close
               </span>

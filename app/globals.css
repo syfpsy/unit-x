@@ -59,9 +59,44 @@ html, body {
   /* Stop iOS rubber-band from scrolling the page behind our fixed CRT
      layer when the keyboard opens. */
   overscroll-behavior: none;
+  /* No double-tap / pinch zoom anywhere. The viewport meta already
+     sets userScalable=no; this removes the 300ms delay + blocks the
+     zoom gesture at the gesture layer too. */
+  touch-action: manipulation;
+  /* Disable iOS text-size auto-adjust that kicks in when rotating. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Default: nothing is user-selectable. Re-enabled explicitly on the
+     message body + inputs below so copy/paste still works where it
+     matters. Prevents iOS from showing the copy-bubble and zooming
+     when the user long-presses on chrome, the topbar, hints, etc. */
+  -webkit-user-select: none;
+  user-select: none;
   -webkit-font-smoothing: none;
   font-smooth: never;
 }
+
+/* Restore selection where users actually want to copy/paste. */
+.msg .body,
+.soul-entry,
+.input-row input,
+.identify input,
+.tweak-row input,
+.tweak-row select,
+textarea,
+pre.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Kill the iOS long-press callout (the grey bubble). */
+* {
+  -webkit-touch-callout: none;
+}
+.msg .body, .input-row input { -webkit-touch-callout: default; }
+
+/* Kill the tap-highlight flash on iOS — we have our own focus state. */
+* { -webkit-tap-highlight-color: transparent; }
 
 ::selection { background: var(--phosphor); color: #000; }
 
@@ -378,6 +413,45 @@ html, body {
   font-size: 10px;
   font-family: inherit;
 }
+/* Button-form hint chips — used for the legends that execute as
+   slash-commands when tapped. Appearance mirrors the span-form
+   chips but adds a cursor + hover/press feedback so the user knows
+   they're interactive. */
+.hints .hint-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: color 140ms;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.hints .hint-btn:hover,
+.hints .hint-btn:focus-visible {
+  color: var(--phosphor);
+}
+.hints .hint-btn:hover kbd,
+.hints .hint-btn:focus-visible kbd {
+  border-color: var(--violet);
+  color: var(--violet);
+  background: rgba(109,94,247,0.14);
+}
+.hints .hint-btn:active kbd {
+  transform: translateY(1px);
+}
+.hints .hint-btn:focus-visible {
+  outline: none;
+}
+.hints .hint-btn:focus-visible kbd {
+  box-shadow: 0 0 6px var(--violet-glow);
+}
 
 /* ============================================================
    Boot sequence overlay
@@ -649,9 +723,11 @@ html, body {
   .topbar .mobile-status      { display: inline-flex; gap: 6px; align-items: center; color: var(--violet); }
 
   /* Hints bar: tighter, smaller, no "bound to …" line
-     (redundant on mobile where every pixel counts). */
+     (redundant on mobile where every pixel counts). Buttons need
+     slightly more touch target so bump padding a bit vs desktop. */
   .hints                      { gap: 10px; padding: 5px 8px; font-size: 10px; letter-spacing: 0.06em; }
   .hints kbd                  { padding: 0 4px; margin-right: 4px; font-size: 9px; }
+  .hints .hint-btn            { padding: 4px 2px; min-height: 28px; }
   .hints > :last-child        { display: none; }
 
   /* Panel frame: tighter padding; the corner brackets stay. */
