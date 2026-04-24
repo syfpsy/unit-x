@@ -437,6 +437,21 @@ export function App() {
             </span>
             <span>ch.07</span>
             <span suppressHydrationWarning>{clockLabel}</span>
+            {/* Mobile-only: tiny mascot-state + stage indicator that
+                takes the place of the side-panel portrait which is
+                hidden below 768px. Desktop CSS keeps this display:none. */}
+            <span className="mobile-status" aria-hidden="true">
+              ◆ {evolution?.title ?? 'live'} ·{' '}
+              {mascotState === 'idle'
+                ? 'standby'
+                : mascotState === 'thinking'
+                ? 'processing'
+                : mascotState === 'speaking'
+                ? 'transmitting'
+                : mascotState === 'dreaming'
+                ? 'dreaming'
+                : 'recovering'}
+            </span>
             <button
               type="button"
               className={`tweaks-btn ${tweaksOpen ? 'open' : ''}`}

@@ -616,3 +616,101 @@ html, body {
   outline-offset: 2px;
   box-shadow: 0 0 8px var(--violet-glow);
 }
+
+/* ============================================================
+   Mobile — phones, narrow tablets (≤ 768px)
+
+   The desktop layout assumes room for a 320px side panel. On phones
+   that leaves almost nothing for the chat, so below this breakpoint
+   we:
+     - force a single-column layout (no side panel; mascot hidden)
+       and surface the current stage + mascot status in the topbar
+       instead so the operator still gets feedback
+     - drop the CRT barrel curvature, which reads as a rendering bug
+       on narrow viewports
+     - let the IDENTIFY card + Tweaks panel follow viewport width
+       instead of their fixed 560/280px
+     - tighten paddings, font sizes, and layout gutters so
+       characters and gaps aren't competing for the same pixels
+   Colour + phosphor stack are unchanged; the aesthetic survives.
+   ============================================================ */
+.topbar .mobile-status { display: none; }
+
+@media (max-width: 768px) {
+  html, body { font-size: 12px; }
+
+  .crt-content { padding: 8px; }
+  .crt-curve   { transform: none; }
+
+  /* Single column. Side panel hides; SidePanel still mounts so
+     ledger fetches still run, but its region is visually removed. */
+  .app[data-layout],
+  .app[data-layout="side-right"],
+  .app[data-layout="side-left"] {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "header"
+      "main"
+      "hints" !important;
+    gap: 8px;
+  }
+  .region-side { display: none !important; }
+
+  /* Topbar: drop secondary crumbs (v4.21, ch.07). Keep brand +
+     status-dot + clock + tweaks + the mobile-only stage/mode
+     status that the App mounts inside .topbar .right. */
+  .topbar                     { padding: 5px 8px; gap: 8px; }
+  .topbar .crumb              { display: none; }
+  .topbar .sep                { display: none; }
+  .topbar .right              { gap: 8px; font-size: 9px; }
+  .topbar .right span:nth-child(2) { display: none; } /* ch.07 */
+  .topbar .mobile-status      { display: inline-flex; gap: 6px; align-items: center; color: var(--violet); }
+
+  /* Hints bar: tighter, smaller, no "bound to …" line
+     (redundant on mobile where every pixel counts). */
+  .hints                      { gap: 10px; padding: 5px 8px; font-size: 10px; letter-spacing: 0.06em; }
+  .hints kbd                  { padding: 0 4px; margin-right: 4px; font-size: 9px; }
+  .hints > :last-child        { display: none; }
+
+  /* Panel frame: tighter padding; the corner brackets stay. */
+  .panel-head                 { padding: 3px 8px; font-size: 10px; }
+  .panel-body                 { padding: 8px; }
+  .panel-body.tight           { padding: 5px 8px; }
+
+  /* Message feed: narrower "who" column so there's room for body. */
+  .msg                        { grid-template-columns: 54px 1fr; gap: 6px; }
+  .msg .body                  { font-size: 12px; line-height: 1.5; }
+  .input-row                  { padding: 6px 8px; gap: 6px; }
+  .input-row .prompt          { font-size: 10px; letter-spacing: 0; }
+  .input-row input            { font-size: 14px; } /* prevent iOS auto-zoom on focus */
+
+  /* IDENTIFY card: follow the viewport. */
+  .identify                   { padding: 8px; }
+  .identify-card              { width: 100%; max-width: 560px; }
+
+  /* Tweaks panel: full-width bottom drawer. */
+  .tweaks-panel {
+    left: 8px; right: 8px; bottom: 8px;
+    width: auto;
+  }
+  .tweak-row                  { grid-template-columns: 72px 1fr; }
+
+  /* Full-screen modals (SoulDoc, Gallery, Timeline): snug gutter. */
+  .soul-doc                   { inset: 8px; }
+  .soul-entry                 { grid-template-columns: 80px 1fr; gap: 8px; font-size: 11px; }
+
+  /* Boot sequence: less generous gutters so more lines fit. */
+  .boot                       { padding: 20px 16px; }
+  .boot pre                   { font-size: 10px; line-height: 1.25; }
+
+  /* Idle reverie: reduce the absolute offsets so it doesn't vanish. */
+  .crt-root > .crt-content > div[class*="region-"] { min-width: 0; }
+}
+
+/* Very narrow phones (≤ 380px) — tighten further. */
+@media (max-width: 380px) {
+  html, body                  { font-size: 11px; }
+  .topbar .right span:first-child { display: none; } /* uplink ok */
+  .hints > span:nth-child(n+6) { display: none; }    /* trim hints to the essentials */
+  .boot pre                   { font-size: 9px; }
+}
