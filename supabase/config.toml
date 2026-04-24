@@ -33,10 +33,12 @@ max_frequency = "1m0s"
 otp_length = 8
 otp_expiry = 3600
 
-# Google OAuth. Credentials must be set in the Supabase dashboard (or
-# via the management API with a PAT) — they don't live in this file.
-# Leaving `enabled = false` until they're configured, so the button
-# errors cleanly with "provider not enabled" instead of a mystery.
+# Google OAuth. Client ID is public (the consent screen shows it in the
+# URL), so it can live in git. The secret is pulled from the local env
+# (see .env.local / Vercel) at `supabase config push` time — never hits
+# the repo. Rotate via RUNBOOK.md → "Rotate the Google OAuth client secret".
 [auth.external.google]
-enabled = false
+enabled = true
+client_id = "656798741201-kmhts0j5ktq1d7s3b8kbol8qq9nrov5v.apps.googleusercontent.com"
+secret = "env(GOOGLE_CLIENT_SECRET)"
 skip_nonce_check = false
