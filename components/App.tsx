@@ -393,6 +393,50 @@ export function App() {
     };
   }, []);
 
+  // Mobile virtual-keyboard watcher. When the keyboard is open we flip
+  // a `data-kbd="open"` attribute on <html> so CSS can collapse low-
+  // priority chrome (hints bar, side panel placeholder) and make room
+  // for the message feed. Uses the Visual Viewport API — the only
+  // reliable cross-browser signal for this. Also resets scrollY on
+  // blur because iOS sometimes shifts the whole window even with
+  // `overflow: hidden`, leaving the fixed CRT layer misaligned.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const threshold = 150; // px — less than this is "just the URL bar hiding"
+    let rafId = 0;
+    const update = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const diff = window.innerHeight - vv.height;
+        const open = diff > threshold;
+        root.setAttribute('data-kbd', open ? 'open' : 'closed');
+        // Expose the precise shift so callers that want to pad around
+        // the keyboard (e.g. sticky input) can `env(kbd)` in CSS via
+        // the fallback path below. Not currently used but cheap.
+        root.style.setProperty('--kbd-offset', `${Math.max(0, diff)}px`);
+      });
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    const onBlur = () => {
+      // iOS leaves the window scrolled after keyboard dismiss. Yank it back.
+      window.scrollTo(0, 0);
+    };
+    document.addEventListener('focusout', onBlur);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      document.removeEventListener('focusout', onBlur);
+      cancelAnimationFrame(rafId);
+      root.removeAttribute('data-kbd');
+      root.style.removeProperty('--kbd-offset');
+    };
+  }, []);
+
   function doSave() {
     // Phase 5: messages and memories auto-persist on every turn, encrypted
     // at rest. /save is kept for muscle memory — it's now an acknowledgement

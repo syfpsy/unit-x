@@ -746,6 +746,16 @@ ${forgetPending.matches.map((m) => `    - [${m.tag}] ${m.text}`).join('\n')}
           onChange={(e) => setInput(e.target.value)}
           onFocus={() => {
             lastActivityRef.current = Date.now();
+            // Wait a frame for the mobile keyboard to finish resizing
+            // the viewport (paired with interactive-widget=resizes-
+            // content), then snap the feed to the newest message so
+            // the operator's last exchange is visible above the
+            // keyboard rather than buried behind it.
+            requestAnimationFrame(() => {
+              if (scrollRef.current) {
+                scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+              }
+            });
           }}
           onKeyDown={(e) => {
             lastActivityRef.current = Date.now();

@@ -50,7 +50,15 @@ html, body {
   font-size: 13px;
   line-height: 1.45;
   overflow: hidden;
+  /* Dynamic viewport height tracks the keyboard on mobile (paired with
+     `interactiveWidget: 'resizes-content'`). Falls back to 100vh on
+     browsers that don't support dvh (all modern Safari/Chrome/Firefox
+     do as of 2022+). */
   height: 100vh;
+  height: 100dvh;
+  /* Stop iOS rubber-band from scrolling the page behind our fixed CRT
+     layer when the keyboard opens. */
+  overscroll-behavior: none;
   -webkit-font-smoothing: none;
   font-smooth: never;
 }
@@ -718,4 +726,26 @@ html, body {
   .topbar .right span:first-child { display: none; } /* uplink ok */
   .hints > span:nth-child(n+6) { display: none; }    /* trim hints to the essentials */
   .boot pre                   { font-size: 9px; }
+}
+
+/* ============================================================
+   Mobile virtual keyboard open — data-kbd="open" on <html> is
+   set by App.tsx via the Visual Viewport API. Free up as much
+   vertical space as possible for the message feed + input row.
+
+   Paired with `interactiveWidget: 'resizes-content'` in the
+   viewport meta, which shrinks the layout viewport too, so
+   `position: fixed` anchors to the visible area above the keyboard.
+   ============================================================ */
+@media (max-width: 768px) {
+  html[data-kbd="open"] .region-hints      { display: none; }
+  html[data-kbd="open"] .mobile-mascot-strip { display: none; }
+  /* Boot banner + idle reverie aren't useful while the operator is
+     typing; hide to reclaim rows. */
+  html[data-kbd="open"] .boot               { padding: 8px; }
+  /* Save-flash pinned top-centre instead of centre so it doesn't
+     sit behind the keyboard when it fires mid-turn. */
+  html[data-kbd="open"] .save-flash {
+    top: 20%;
+  }
 }

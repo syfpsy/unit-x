@@ -50,6 +50,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: '#000000',
   colorScheme: 'dark',
+  // Tell mobile browsers the virtual keyboard should shrink the layout
+  // viewport, not just the visual one. Without this, `100vh` / `100dvh`
+  // stay fixed at full-screen and the input row ends up behind the
+  // keyboard. With it, the grid actually re-lays-out as the keyboard
+  // appears. Also shows nicely on desktop (no-op).
+  interactiveWidget: 'resizes-content',
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
