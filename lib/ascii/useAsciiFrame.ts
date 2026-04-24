@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { type CellFn, render } from './engine';
 import { usePrefersReducedMotion } from '@/lib/usePrefersReducedMotion';
 
@@ -38,9 +38,19 @@ export function useAsciiFrame(
   const { width, height, fps = 12, reducedMotionFrame, running = true } = opts;
   const reduced = usePrefersReducedMotion();
 
+  // The caller's cell fn is almost always produced inline (`scan(...)`)
+  // so its identity changes on every render. We ref it so the animation
+  // loop doesn't tear down + recreate on parent re-renders. The loop
+  // always reads the latest cell fn through the ref.
+  const cellRef = useRef(cell);
+  useEffect(() => {
+    cellRef.current = cell;
+  }, [cell]);
+
   const staticFrame = useMemo(
     () => reducedMotionFrame ?? render(cell, width, height, 0),
-    [cell, width, height, reducedMotionFrame],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [width, height, reducedMotionFrame],
   );
   const [liveFrame, setLiveFrame] = useState(staticFrame);
 
@@ -52,14 +62,14 @@ export function useAsciiFrame(
     let last = 0;
     const loop = (now: number) => {
       if (now - last >= interval) {
-        setLiveFrame(render(cell, width, height, (now - start) / 1000));
+        setLiveFrame(render(cellRef.current, width, height, (now - start) / 1000));
         last = now;
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [cell, width, height, fps, reduced, running]);
+  }, [width, height, fps, reduced, running]);
 
   return reduced || !running ? staticFrame : liveFrame;
 }
