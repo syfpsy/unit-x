@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { usePrefersReducedMotion } from '@/lib/usePrefersReducedMotion';
 import { mergeSpecs, renderPortrait } from '@/lib/portrait/render';
 import { STAGE_SPECS } from '@/lib/portrait/stages';
-import { pulse, rain, stars } from '@/lib/ascii/primitives';
+import { pulse, rain, ring, stars } from '@/lib/ascii/primitives';
 import { AsciiField } from './AsciiField';
 import type { CosmeticPayload } from '@/lib/cosmetics/types';
 import type { EvolutionStage } from '@/lib/evolution';
@@ -31,6 +31,10 @@ export function Mascot({
 }: MascotProps) {
   const [blink, setBlink] = useState(false);
   const [frame, setFrame] = useState(0);
+  /** Monotonically-increasing key that remounts the tap ring and
+   *  re-fires its TTL. Only counts up; the AsciiField resets its
+   *  internal clock on each new key. */
+  const [rippleKey, setRippleKey] = useState(0);
   const reduced = usePrefersReducedMotion();
 
   useEffect(() => {
@@ -137,7 +141,50 @@ export function Mascot({
       role="img"
       aria-label={`UNIT-X · ${status.toLowerCase()}`}
     >
-      <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div
+        style={{
+          position: 'relative',
+          display: 'inline-block',
+          cursor: 'pointer',
+        }}
+        onClick={() => setRippleKey((k) => k + 1)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setRippleKey((k) => k + 1);
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        aria-label="ping the unit"
+        title="tap to ping"
+      >
+        {/* Tap ripple — remounts on every click via `key`, so the
+             AsciiField internal clock resets and the ring fires fresh.
+             ttl matches the primitive default (1.2s). Skip when
+             reduced-motion: the single static frame looks like a
+             stuck ring. */}
+        {rippleKey > 0 && !reduced && (
+          <AsciiField
+            key={rippleKey}
+            cell={ring({ speed: 14, thickness: 1.3, ttl: 1.1 })}
+            width={BG_W}
+            height={BG_H}
+            fps={18}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              color: 'var(--violet)',
+              opacity: 0.85,
+              pointerEvents: 'none',
+              zIndex: 3,
+              fontSize: 'inherit',
+              textShadow: '0 0 6px var(--violet-glow)',
+            }}
+          />
+        )}
         {/* Dreaming: slow rain behind the mascot. */}
         {isDreaming && (
           <AsciiField

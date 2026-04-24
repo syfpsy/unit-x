@@ -805,6 +805,72 @@ pre.selectable {
 }
 
 /* ============================================================
+   Command autocomplete panel — sits above the input row when the
+   operator starts typing a slash command. Compact, monospace, and
+   shares the panel-chrome border style so it reads as part of the
+   terminal.
+   ============================================================ */
+.cmd-suggest {
+  border: 1px solid var(--border);
+  border-bottom: none;
+  background: var(--bg-panel);
+  padding: 4px 0 2px;
+  display: flex;
+  flex-direction: column;
+  max-height: 180px;
+  overflow-y: auto;
+  position: relative;
+}
+.cmd-suggest-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 4px 12px;
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--phosphor-dim);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.cmd-suggest-row:hover,
+.cmd-suggest-row.active {
+  background: rgba(var(--ph-r), var(--ph-g), var(--ph-b), 0.08);
+  color: var(--phosphor);
+}
+.cmd-suggest-row.active {
+  outline: 1px solid var(--violet);
+  outline-offset: -1px;
+}
+.cmd-suggest-row .cmd {
+  color: var(--violet);
+  font-weight: 600;
+  min-width: 140px;
+  letter-spacing: 0.04em;
+}
+.cmd-suggest-row .desc {
+  color: var(--phosphor-faint);
+  font-size: 11px;
+}
+.cmd-suggest-hint {
+  padding: 3px 12px 2px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--phosphor-faint);
+  border-top: 1px dashed var(--border);
+  margin-top: 2px;
+}
+@media (max-width: 768px) {
+  .cmd-suggest                { max-height: 40vh; }
+  .cmd-suggest-row            { padding: 8px 10px; }
+  .cmd-suggest-row .cmd       { min-width: 110px; font-size: 12px; }
+  .cmd-suggest-row .desc      { font-size: 10px; }
+  .cmd-suggest-hint           { font-size: 8px; }
+}
+
+/* ============================================================
    Mobile virtual keyboard open — data-kbd="open" on <html> is
    set by App.tsx via the Visual Viewport API. Free up as much
    vertical space as possible for the message feed + input row.

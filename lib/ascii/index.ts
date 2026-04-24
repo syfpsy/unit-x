@@ -27,6 +27,7 @@ export {
   type StarsOptions,
   type PulseOptions,
   type ShiverOptions,
+  type RingOptions,
   scan,
   wave,
   rain,
@@ -34,6 +35,7 @@ export {
   pulse,
   morph,
   shiver,
+  ring,
 } from './primitives';
 
 export { useAsciiFrame, type UseAsciiFrameOptions } from './useAsciiFrame';

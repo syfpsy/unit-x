@@ -236,3 +236,54 @@ export function shiver(base: CellFn, opts: ShiverOptions = {}): CellFn {
     return base(t, sx, y, W, H);
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Ring — expanding circle, for taps / pings                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface RingOptions {
+  /** Center in grid coords. Defaults to the middle of the field. */
+  cx?: number;
+  cy?: number;
+  /** Cells per second the ring expands outward. */
+  speed?: number;
+  /** Ring thickness in cells — bigger = softer. */
+  thickness?: number;
+  /** How long one ring lives before it fades (seconds). */
+  ttl?: number;
+  /** Character at the ring's sharp edge + brightness ramp inward. */
+  ramp?: string;
+  /**
+   * Account for non-square terminal cells — monospace chars are
+   * roughly 2x taller than wide, so a "circle" on the grid needs
+   * horizontal stretch. Default 2 gives visually-round rings.
+   */
+  aspect?: number;
+}
+
+/**
+ * One expanding ring over `ttl` seconds. After ttl the function
+ * returns ' ' forever. Use with a key prop to remount and re-fire.
+ */
+export function ring(opts: RingOptions = {}): CellFn {
+  const speed = opts.speed ?? 14;
+  const thickness = opts.thickness ?? 1.4;
+  const ttl = opts.ttl ?? 1.2;
+  const ramp = opts.ramp ?? ' ·:-=+*#';
+  const aspect = opts.aspect ?? 2;
+  return (t, x, y, W, H) => {
+    if (t > ttl) return ' ';
+    const cx = opts.cx ?? W / 2;
+    const cy = opts.cy ?? H / 2;
+    const dx = (x - cx) / aspect;
+    const dy = y - cy;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    const r = t * speed;
+    const off = Math.abs(d - r);
+    if (off > thickness) return ' ';
+    // Fade the ramp as the ring ages so it dissolves smoothly.
+    const age = t / ttl;
+    const brightness = (1 - off / thickness) * (1 - age);
+    return rampChar(ramp, brightness);
+  };
+}

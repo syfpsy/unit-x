@@ -6,6 +6,7 @@ import {
   type RefObject,
   type SetStateAction,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -22,6 +23,7 @@ const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
   { cmd: '/settings', desc: 'aesthetic, layout, and pace' },
   { cmd: '/timeline', desc: 'see the record of what you have earned' },
   { cmd: '/constellation', desc: 'plot the ledger as a sky of shared words' },
+  { cmd: '/recall', desc: 'search the ledger for a keyword (local, no tokens)' },
   { cmd: '/save', desc: 'commit current thread to /soul/' },
   { cmd: '/clear', desc: 'wipe visible scroll (memory persists)' },
   { cmd: '/who', desc: 'report identity + uptime' },
@@ -32,6 +34,11 @@ const HELP_TEXT: ReadonlyArray<{ cmd: string; desc: string }> = [
   { cmd: '/export', desc: 'download your full ledger (decrypted, json)' },
   { cmd: '/delete-account', desc: 'permanently remove your soul and sign out' },
 ];
+
+/** Max entries to show at once in the /recall output. */
+const RECALL_LIMIT = 12;
+/** Max entries to remember in the up/down history stack. */
+const HISTORY_LIMIT = 40;
 
 function buildSystemPrompt(
   unitName: string,
@@ -167,6 +174,49 @@ export function Terminal({
    *  whenever the user types a key that isn't Tab. */
   const tabIdxRef = useRef(0);
   const lastPrefillStamp = useRef(0);
+  /** Rolling stack of submitted user inputs for ↑/↓ recall. Most
+   *  recent at the end. Capped at HISTORY_LIMIT. */
+  const historyRef = useRef<string[]>([]);
+  /** Cursor into history. -1 = live draft (not traversing). 0.. =
+   *  position from the newest submission. */
+  const [historyIdx, setHistoryIdx] = useState(-1);
+  /** What the user was typing before they hit ↑ the first time, so
+   *  ↓ past the newest entry restores their draft. */
+  const draftRef = useRef('');
+  /** Selected suggestion index while the autocomplete panel is open.
+   *  Reset when the input changes so a filter shift doesn't land on
+   *  a stale row. */
+  const [suggestionIdx, setSuggestionIdx] = useState(0);
+
+  /** Commands that match the current first-token of the input. Only
+   *  populated when the input starts with `/` and has no space yet —
+   *  once the user typed a space, we assume they're typing args and
+   *  the panel gets out of the way. */
+  const suggestions = useMemo(() => {
+    if (!input.startsWith('/') || input.includes(' ')) return [];
+    const prefix = input.toLowerCase();
+    return HELP_TEXT.filter((h) => h.cmd.toLowerCase().startsWith(prefix));
+  }, [input]);
+
+  useEffect(() => {
+    // Whenever the match set shifts (user kept typing), start the
+    // selection at the top so arrow-key navigation stays predictable.
+    setSuggestionIdx(0);
+  }, [suggestions]);
+
+  function acceptSuggestion(s: { cmd: string; desc: string }) {
+    // Append a trailing space for commands that usually take an arg.
+    const takesArg = /^\/(forget|recall)(\b|$)/.test(s.cmd);
+    const next = takesArg ? s.cmd + ' ' : s.cmd;
+    setInput(next);
+    setHistoryIdx(-1);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(next.length, next.length);
+    });
+  }
 
   // Hint-chip prefill handoff from App.tsx — stamp changes drive the
   // effect so re-clicking the same chip re-prefills (helpful when the
@@ -459,6 +509,49 @@ export function Terminal({
     }
   }
 
+  function handleRecall(arg: string) {
+    // No arg → show the five most recent. With an arg → substring
+    // match across tag + text. Case-insensitive, local-only — does
+    // not round-trip the RAG pipeline, so it's free and instant.
+    const needle = arg.trim().toLowerCase();
+    const subset = !needle
+      ? memories.slice(-5)
+      : memories.filter(
+          (m) =>
+            m.text.toLowerCase().includes(needle) ||
+            m.tag.toLowerCase().includes(needle),
+        );
+    if (subset.length === 0) {
+      setMessages((ms) => [
+        ...ms,
+        {
+          id: Date.now(),
+          who: 'sys',
+          text: `> no ledger entries matched "${arg}". try /soul for the full listing.`,
+          ts: Date.now(),
+        },
+      ]);
+      return;
+    }
+    const shown = subset.slice(-RECALL_LIMIT);
+    const header =
+      !needle
+        ? `> last ${shown.length} memorie(s):`
+        : `> ${subset.length} match${subset.length === 1 ? '' : 'es'} for "${arg}"${subset.length > RECALL_LIMIT ? ` (showing ${RECALL_LIMIT})` : ''}:`;
+    const body = shown
+      .map((m) => `    · [${m.tag}] ${m.text}`)
+      .join('\n');
+    setMessages((ms) => [
+      ...ms,
+      {
+        id: Date.now(),
+        who: 'sys',
+        text: `${header}\n${body}`,
+        ts: Date.now(),
+      },
+    ]);
+  }
+
   function handleForget(arg: string) {
     if (!arg) {
       setMessages((ms) => [
@@ -560,6 +653,13 @@ export function Terminal({
     const t = input.trim();
     if (!t) return;
     setInput('');
+    setHistoryIdx(-1);
+    draftRef.current = '';
+    // Append to history (no immediate duplicates, cap to HISTORY_LIMIT).
+    const prev = historyRef.current;
+    if (prev[prev.length - 1] !== t) {
+      historyRef.current = [...prev.slice(-(HISTORY_LIMIT - 1)), t];
+    }
     lastActivityRef.current = Date.now();
 
     if (forgetPending) {
@@ -642,6 +742,10 @@ export function Terminal({
       }
       if (cmd === '/forget') {
         handleForget(arg);
+        return;
+      }
+      if (cmd === '/recall') {
+        handleRecall(arg);
         return;
       }
       if (cmd === '/export') {
@@ -764,12 +868,53 @@ ${forgetPending.matches.map((m) => `    - [${m.tag}] ${m.text}`).join('\n')}
           )}
         </div>
       </div>
+      {suggestions.length > 0 && (
+        <div
+          className="cmd-suggest"
+          role="listbox"
+          aria-label="matching directives"
+        >
+          {suggestions.map((s, i) => (
+            <button
+              key={s.cmd}
+              type="button"
+              role="option"
+              aria-selected={i === suggestionIdx}
+              className={`cmd-suggest-row ${i === suggestionIdx ? 'active' : ''}`}
+              // Use onMouseDown so clicking a row doesn't first blur
+              // the input (which would dismiss the panel before the
+              // click lands).
+              onMouseDown={(e) => {
+                e.preventDefault();
+                acceptSuggestion(s);
+              }}
+              onMouseEnter={() => setSuggestionIdx(i)}
+            >
+              <span className="cmd">{s.cmd}</span>
+              <span className="desc">{s.desc}</span>
+            </button>
+          ))}
+          <span className="cmd-suggest-hint">
+            ↑↓ navigate · ⇥ cycle · ↵ pick · esc cancel
+          </span>
+        </div>
+      )}
       <form className="input-row" onSubmit={submit}>
         <span className="prompt">{unitName.toLowerCase()}@nxyz:~$</span>
         <input
           ref={inputRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            // Typing anything that doesn't match the recalled line
+            // drops out of history-cursor mode so the next ↑ starts
+            // from the newest submission again.
+            if (historyIdx !== -1) {
+              const hist = historyRef.current;
+              const recalled = hist[hist.length - 1 - historyIdx];
+              if (e.target.value !== recalled) setHistoryIdx(-1);
+            }
+          }}
           onFocus={() => {
             lastActivityRef.current = Date.now();
             // Wait a frame for the mobile keyboard to finish resizing
@@ -787,6 +932,60 @@ ${forgetPending.matches.map((m) => `    - [${m.tag}] ${m.text}`).join('\n')}
             lastActivityRef.current = Date.now();
             if (e.key === 'Escape' && forgetPending) {
               cancelForget();
+            }
+            // Escape clears the input when the suggestion panel is
+            // open (which also hides the panel via `suggestions`
+            // dropping to empty). Stop propagation so the global
+            // escape-closes-modals handler doesn't fire as well.
+            if (e.key === 'Escape' && suggestions.length > 0) {
+              e.preventDefault();
+              e.stopPropagation();
+              setInput('');
+              return;
+            }
+            // When the autocomplete panel is open, arrows + enter
+            // drive the panel. Otherwise ↑/↓ fall through to history.
+            if (suggestions.length > 0) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSuggestionIdx((i) => (i + 1) % suggestions.length);
+                return;
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSuggestionIdx(
+                  (i) => (i - 1 + suggestions.length) % suggestions.length,
+                );
+                return;
+              }
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                acceptSuggestion(suggestions[suggestionIdx]);
+                return;
+              }
+            }
+            // ↑ / ↓ cycle through previously-submitted messages, like
+            // a real shell. The user's current draft is stashed on
+            // first ↑ so ↓ past the newest entry restores it.
+            if (e.key === 'ArrowUp' && !input.startsWith('/')) {
+              const hist = historyRef.current;
+              if (hist.length === 0) return;
+              e.preventDefault();
+              if (historyIdx === -1) draftRef.current = input;
+              const nextIdx = Math.min(historyIdx + 1, hist.length - 1);
+              setHistoryIdx(nextIdx);
+              setInput(hist[hist.length - 1 - nextIdx]);
+              return;
+            }
+            if (e.key === 'ArrowDown' && historyIdx >= 0) {
+              e.preventDefault();
+              const nextIdx = historyIdx - 1;
+              setHistoryIdx(nextIdx);
+              const hist = historyRef.current;
+              setInput(
+                nextIdx === -1 ? draftRef.current : hist[hist.length - 1 - nextIdx],
+              );
+              return;
             }
             // Tab-completion for slash commands. Works on the first
             // token only — args after the first space are preserved

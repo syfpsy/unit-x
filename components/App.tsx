@@ -578,6 +578,7 @@ export function App() {
                 [
                   { cmd: '/help',          label: 'directives' },
                   { cmd: '/soul',          label: 'ledger' },
+                  { cmd: '/recall',        label: 'search', needsArg: true },
                   { cmd: '/dream',         label: 'reverie' },
                   { cmd: '/essence',       label: 'portrait' },
                   { cmd: '/forget',        label: 'excise', needsArg: true },
